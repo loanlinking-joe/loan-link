@@ -319,7 +319,7 @@ def update_profile():
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.json
-    email = data.get('email')
+    email = data.get('email', '').lower().strip()
     password = data.get('password')
     name = data.get('name')
     
@@ -346,7 +346,7 @@ def register():
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
-    email = data.get('email')
+    email = data.get('email', '').lower().strip()
     password = data.get('password')
     
     conn = get_db_connection()
@@ -354,8 +354,6 @@ def login():
     conn.close()
     
     if user and user['password'] == hash_password(password):
-        # Generate new token or update existing? Let's just return existing for now or update it.
-        # Ideally update it.
         token = str(uuid.uuid4())
         conn = get_db_connection()
         conn.execute('UPDATE users SET token = ? WHERE id = ?', (token, user['id']))
@@ -363,12 +361,17 @@ def login():
         conn.close()
         return jsonify({'token': token, 'email': user['email'], 'name': user['name']})
     else:
+        # Debugging hash mismatch
+        if user:
+            print(f"DEBUG: Login failed for {email}. Password hash mismatch.", flush=True)
+        else:
+            print(f"DEBUG: Login failed. User {email} not found.", flush=True)
         return jsonify({'error': 'Invalid credentials'}), 401
 
 @app.route('/api/forgot-password', methods=['POST'])
 def forgot_password():
     data = request.json
-    email = data.get('email')
+    email = data.get('email', '').lower().strip()
     print(f"DEBUG: Forgot password request for: {email}", flush=True)
     
     conn = get_db_connection()
@@ -548,7 +551,7 @@ def create_loan():
     
     # Data from frontend
     role = data.get('role') # 'lender' or 'borrower' (User's role)
-    other_email = data.get('counterpartyEmail') # New field
+    other_email = data.get('counterpartyEmail', '').lower().strip() # New field
     counterparty_name = data.get('counterpartyName') # Just for display if we want
     amount = data.get('amount')
     rate = data.get('rate')
