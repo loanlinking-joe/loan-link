@@ -230,9 +230,9 @@ This is an automated notification from LoanLink.
 def debug_email():
     results = []
     tests = [
+        ("Web Port 443 (Google)", "google.com", 443, "raw"),
         ("Gmail SSL", "smtp.gmail.com", 465, "ssl"),
         ("Gmail TLS", "smtp.gmail.com", 587, "tls"),
-        ("Google Relay TLS", "smtp-relay.gmail.com", 587, "tls")
     ]
     
     for name, host, port, mode in tests:
@@ -241,10 +241,13 @@ def debug_email():
             if mode == "ssl":
                 with smtplib.SMTP_SSL(host, port, timeout=5) as s:
                     s.noop()
-            else:
+            elif mode == "tls":
                 with smtplib.SMTP(host, port, timeout=5) as s:
                     s.starttls()
                     s.noop()
+            else:
+                s = socket.create_connection((host, port), timeout=5)
+                s.close()
             results.append(f"✅ {name}: SUCCESS")
         except Exception as e:
             results.append(f"❌ {name}: FAILED ({str(e)})")
