@@ -33,6 +33,13 @@ def handle_exception(e):
         "details": str(e)
     }), 500
 
+@app.route('/api/debug-users')
+def debug_users():
+    conn = get_db_connection()
+    users = conn.execute('SELECT email FROM users').fetchall()
+    conn.close()
+    return jsonify([u['email'] for u in users])
+
 # Email Configuration (Gmail SMTP)
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
@@ -107,12 +114,10 @@ def init_db():
         try: c.execute("ALTER TABLE loans ADD COLUMN creator_email TEXT")
         except: pass
 
-        # Only run expensive updates if we haven't already
-        c.execute("PRAGMA user_version")
-        if c.fetchone()[0] < 2:
-            c.execute("UPDATE users SET email = LOWER(email)")
-            c.execute("UPDATE reset_tokens SET email = LOWER(email)")
-            c.execute("PRAGMA user_version = 2")
+        # Ensure ALL emails are lowercased for stability (running every time for safety)
+        c.execute("UPDATE users SET email = LOWER(email)")
+        c.execute("UPDATE reset_tokens SET email = LOWER(email)")
+        c.execute("PRAGMA user_version = 2")
         
         conn.commit()
         conn.close()
