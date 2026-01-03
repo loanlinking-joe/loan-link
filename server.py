@@ -206,17 +206,18 @@ This is an automated notification from LoanLink.
         msg.attach(part2)
         
         # Send email
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
             server.starttls()
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
         
-        print(f"✅ Email sent to {recipient_email}")
-        return True
+        print(f"✅ Email successfully sent to {recipient_email}", flush=True)
+        return True, "Success"
         
     except Exception as e:
-        print(f"❌ Failed to send email: {e}")
-        return False
+        error_msg = f"Failed to send email: {str(e)}"
+        print(f"❌ {error_msg}", flush=True)
+        return False, error_msg
 
 # --- Auth Routes ---
 
@@ -348,15 +349,16 @@ def forgot_password():
     msg.attach(MIMEText(body, 'html'))
     
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
+            server.set_debuglevel(1) # Enable verbose SMTP logs in Render
             server.starttls()
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
         print(f"✅ Reset email sent to {email}", flush=True)
+        return jsonify({'success': True})
     except Exception as e:
         print(f"❌ Error sending reset email: {e}", flush=True)
-
-    return jsonify({'success': True})
+        return jsonify({'error': 'Failed to send reset email', 'details': str(e)}), 500
 
 @app.route('/api/reset-password', methods=['POST'])
 def reset_password():
@@ -494,7 +496,10 @@ def create_loan():
         'role': role,
         'creator_name': user['name'] if user['name'] else user['email']
     }
-    send_loan_notification_email(other_email, email_data)
+    
+    success, msg = send_loan_notification_email(other_email, email_data)
+    if not success:
+        return jsonify({'success': False, 'error': f"Loan created, but {msg}"}), 200 # Still return 200 since loan is created
     
     return jsonify({'success': True})
 
@@ -591,9 +596,12 @@ def update_loan(loan_id):
         'role': role,
         'creator_name': user['name'] if user['name'] else user['email']
     }
-    send_loan_notification_email(other_email, email_data)
+    success, msg = send_loan_notification_email(other_email, email_data)
     
     conn.close()
+    if not success:
+        return jsonify({'success': False, 'error': f"Loan updated, but {msg}"}), 200
+    
     return jsonify({'success': True})
 
 @app.route('/api/loans/<int:loan_id>/accept', methods=['POST'])
