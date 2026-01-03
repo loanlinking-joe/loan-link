@@ -44,10 +44,12 @@ if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME, timeout=60)
+    # Only the first worker to start should successfully run full initialization
+    # We use a long timeout to wait for other workers to finish
     try:
+        conn = sqlite3.connect(DB_NAME, timeout=60)
         conn.execute('PRAGMA journal_mode=WAL')
-        conn.execute('PRAGMA synchronous=NORMAL')
+        conn.execute('PRAGMA busy_timeout=60000')
         c = conn.cursor()
         
         # User Table
@@ -97,28 +99,30 @@ def init_db():
             FOREIGN KEY(loan_id) REFERENCES loans(id)
         )''')
 
-        # Migrations
-        # Add profile columns if they don't exist
+        # Migrations (Safe multi-run)
         for col in ['alias', 'contact', 'dob']:
-            try:
-                c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
-            except sqlite3.OperationalError:
-                pass
+            try: c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+            except: pass
 
-        try:
-            c.execute("ALTER TABLE loans ADD COLUMN creator_email TEXT")
-        except sqlite3.OperationalError:
-            pass
+        try: c.execute("ALTER TABLE loans ADD COLUMN creator_email TEXT")
+        except: pass
 
-        # Ensure emails are lowercased for stability
-        c.execute("UPDATE users SET email = LOWER(email)")
-        c.execute("UPDATE reset_tokens SET email = LOWER(email)")
+        # Only run expensive updates if we haven't already
+        c.execute("PRAGMA user_version")
+        if c.fetchone()[0] < 2:
+            c.execute("UPDATE users SET email = LOWER(email)")
+            c.execute("UPDATE reset_tokens SET email = LOWER(email)")
+            c.execute("PRAGMA user_version = 2")
         
         conn.commit()
+        conn.close()
+    except sqlite3.OperationalError as e:
+        if "locked" in str(e).lower():
+            print("ℹ️ Database busy during init, skipping (likely handled by another process).", flush=True)
+        else:
+            raise e
     except Exception as e:
         print(f"⚠️ Warning during init_db: {e}", flush=True)
-    finally:
-        conn.close()
 
 def get_db_connection():
     conn = sqlite3.connect(DB_NAME, timeout=60)
