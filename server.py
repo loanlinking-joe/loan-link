@@ -191,14 +191,14 @@ def send_loan_notification_email(recipient_email, loan_data):
         # Use Resend if API Key is available
         if RESEND_API_KEY:
             print(f"DEBUG: Attempting to send email via Resend API to {recipient_email}", flush=True)
-            resend.Emails.send({
+            r = resend.Emails.send({
                 "from": "LoanLink <onboarding@resend.dev>",
                 "to": [recipient_email],
                 "subject": subject,
                 "html": html,
                 "text": text
             })
-            print(f"✅ Email successfully sent via Resend to {recipient_email}", flush=True)
+            print(f"✅ Email successfully sent via Resend to {recipient_email}. ID: {r.get('id')}", flush=True)
             return True, "Success"
 
         # Fallback to SMTP (Gmail)
@@ -387,12 +387,13 @@ def forgot_password():
     
     if RESEND_API_KEY:
         print(f"DEBUG: Sending reset email via Resend to {email}", flush=True)
-        resend.Emails.send({
+        r = resend.Emails.send({
             "from": "LoanLink <onboarding@resend.dev>",
             "to": [email],
             "subject": "Reset Your LoanLink Password",
             "html": body
         })
+        print(f"✅ Reset email sent via Resend. ID: {r.get('id')}", flush=True)
         return jsonify({'success': True})
 
     try:
