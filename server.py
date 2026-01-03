@@ -297,6 +297,7 @@ def login():
 def forgot_password():
     data = request.json
     email = data.get('email')
+    print(f"DEBUG: Forgot password request for: {email}", flush=True)
     
     conn = get_db_connection()
     user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
@@ -340,8 +341,9 @@ def forgot_password():
             server.starttls()
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
+        print(f"✅ Reset email sent to {email}", flush=True)
     except Exception as e:
-        print(f"Error sending reset email: {e}")
+        print(f"❌ Error sending reset email: {e}", flush=True)
 
     return jsonify({'success': True})
 

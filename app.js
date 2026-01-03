@@ -491,6 +491,7 @@ const initAuthListeners = () => {
             switchBtn.textContent = 'Login';
             document.getElementById('auth-email').placeholder = "Enter your email";
             document.getElementById('auth-password').closest('.form-group').style.display = 'none';
+            document.getElementById('auth-password').required = false;
             document.getElementById('forgot-password-container').style.display = 'none';
         }
     };
@@ -507,6 +508,7 @@ const initAuthListeners = () => {
         if (state.authMode === 'forgot') {
             state.authMode = 'login';
             document.getElementById('auth-password').closest('.form-group').style.display = 'block';
+            document.getElementById('auth-password').required = true;
         } else {
             state.authMode = state.authMode === 'login' ? 'signup' : 'login';
         }
@@ -517,6 +519,7 @@ const initAuthListeners = () => {
         e.preventDefault();
         const email = document.getElementById('auth-email').value;
         const password = document.getElementById('auth-password').value;
+        console.log("Form submitted. Mode:", state.authMode, "Email:", email);
 
         if (state.authMode === 'login') {
             login(email, password);
