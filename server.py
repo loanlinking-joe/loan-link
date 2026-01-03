@@ -219,6 +219,37 @@ This is an automated notification from LoanLink.
         print(f"❌ {error_msg}", flush=True)
         return False, error_msg
 
+@app.route('/api/debug-email')
+def debug_email():
+    results = []
+    tests = [
+        ("Gmail SSL", "smtp.gmail.com", 465, "ssl"),
+        ("Gmail TLS", "smtp.gmail.com", 587, "tls"),
+        ("Google Relay TLS", "smtp-relay.gmail.com", 587, "tls")
+    ]
+    
+    for name, host, port, mode in tests:
+        try:
+            print(f"DEBUG: Testing {name} ({host}:{port})...", flush=True)
+            if mode == "ssl":
+                with smtplib.SMTP_SSL(host, port, timeout=5) as s:
+                    s.noop()
+            else:
+                with smtplib.SMTP(host, port, timeout=5) as s:
+                    s.starttls()
+                    s.noop()
+            results.append(f"✅ {name}: SUCCESS")
+        except Exception as e:
+            results.append(f"❌ {name}: FAILED ({str(e)})")
+            
+    return jsonify({
+        "summary": results,
+        "env_check": {
+            "address_set": bool(SENDER_EMAIL),
+            "password_set": bool(SENDER_PASSWORD)
+        }
+    })
+
 # --- Auth Routes ---
 
 @app.route('/api/profile', methods=['GET'])
