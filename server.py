@@ -386,6 +386,7 @@ def forgot_password():
 
     # Send reset email
     reset_url = f"{request.host_url}#reset?token={token}"
+    print(f"DEBUG: Manual Reset Link for {email}: {reset_url}", flush=True)
     msg = MIMEMultipart()
     msg['Subject'] = "Reset Your LoanLink Password"
     msg['From'] = SENDER_EMAIL
