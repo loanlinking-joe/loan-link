@@ -27,11 +27,19 @@ const apiRequest = async (endpoint, method = 'GET', body = null) => {
 
     try {
         const response = await fetch(`${API_URL}${endpoint}`, config);
-        const data = await response.json();
-        if (!response.ok) {
-            throw new Error(data.error || 'API Request Failed');
+        const contentType = response.headers.get("content-type");
+
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'API Request Failed');
+            }
+            return data;
+        } else {
+            const text = await response.text();
+            console.error("Server returned non-JSON response:", text);
+            throw new Error(`Server Error: Received HTML instead of data. Check the app logs on Render.`);
         }
-        return data;
     } catch (error) {
         console.error(error);
         if (error.message === 'Unauthorized' || error.message.includes('401')) {
