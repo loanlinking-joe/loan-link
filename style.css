@@ -418,3 +418,143 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
 }
+
+/* --- Mobile Responsiveness --- */
+@media (max-width: 768px) {
+    body {
+        overflow-y: auto;
+    }
+
+    .app-layout {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+    }
+
+    /* Sidebar becomes Bottom Nav */
+    .sidebar {
+        width: 100%;
+        height: 70px;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        z-index: 1000;
+        flex-direction: row;
+        padding: 0 10px;
+        border-right: none;
+        border-top: 1px solid var(--glass-border);
+        background: rgba(15, 23, 42, 0.95);
+    }
+
+    .sidebar .brand,
+    .sidebar .user-profile,
+    .sidebar .nav-item span {
+        display: none;
+    }
+
+    .nav-links {
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: center;
+        width: 100%;
+        gap: 0;
+    }
+
+    .nav-item {
+        padding: 10px;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .nav-item ion-icon {
+        font-size: 1.5rem;
+    }
+
+    #nav-logout {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 0 !important;
+        padding: 10px;
+    }
+
+    /* Main Content */
+    .main-content {
+        padding: 20px 15px 100px 15px;
+        /* Bottom padding for the nav bar */
+        height: auto;
+    }
+
+    .page-title {
+        font-size: 1.5rem;
+    }
+
+    /* Grid stacking */
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+    }
+
+    /* Forms */
+    .glass-panel {
+        padding: 20px 15px;
+    }
+
+    /* Loan Items */
+    .loan-item {
+        padding: 15px;
+        flex-wrap: wrap;
+    }
+
+    .loan-icon {
+        width: 40px;
+        height: 40px;
+        margin-right: 12px;
+    }
+
+    .loan-details {
+        flex: 1;
+        min-width: 150px;
+    }
+
+    .loan-values {
+        width: 100%;
+        text-align: left;
+        margin-top: 10px;
+        margin-right: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* Modals */
+    .modal-content {
+        width: 95%;
+        margin: 10px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+}
+
+/* Small devices adjustment */
+@media (max-width: 480px) {
+    .page-title {
+        font-size: 1.3rem;
+    }
+
+    .loan-actions {
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    .loan-actions .btn {
+        flex: 1;
+        text-align: center;
+        padding: 8px;
+        font-size: 0.85rem;
+    }
+}
