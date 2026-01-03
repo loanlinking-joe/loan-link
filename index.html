@@ -49,6 +49,32 @@
                     <a href="#" id="auth-switch-btn"
                         style="color: #818cf8; font-weight: 600; text-decoration: none; margin-left: 5px;">Sign Up</a>
                 </div>
+                <div class="text-center mt-2" id="forgot-password-container">
+                    <a href="#" id="forgot-password-btn"
+                        style="color: var(--text-secondary); font-size: 0.8em; text-decoration: none;">Forgot
+                        Password?</a>
+                </div>
+            </section>
+        </div>
+    </template>
+
+    <!-- 1b. Reset Password View -->
+    <template id="view-reset-password">
+        <div class="auth-wrapper">
+            <section class="glass-panel" style="width: 100%; max-width: 400px; padding: 40px;">
+                <div class="text-center" style="margin-bottom: 30px;">
+                    <h2>Set New Password</h2>
+                    <p style="color: var(--text-secondary);">Enter your new password below.</p>
+                </div>
+                <form id="reset-password-form">
+                    <div class="form-group">
+                        <input type="password" id="reset-new-password" class="form-input" placeholder="New Password"
+                            required minlength="6">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">Update Password</button>
+                    <button type="button" class="btn btn-secondary mt-2" style="width: 100%;"
+                        onclick="navigate('auth')">Back to Login</button>
+                </form>
             </section>
         </div>
     </template>

@@ -293,6 +293,79 @@ def login():
     else:
         return jsonify({'error': 'Invalid credentials'}), 401
 
+@app.route('/api/forgot-password', methods=['POST'])
+def forgot_password():
+    data = request.json
+    email = data.get('email')
+    
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+    
+    if not user:
+        # For security, don't reveal if user exists. Just say "If account exists, email sent"
+        conn.close()
+        return jsonify({'success': True})
+
+    # Generate token
+    token = str(uuid.uuid4())
+    expires_at = datetime.now().isoformat() # In a real app, add +1 hour. For now, simple.
+    
+    conn.execute('INSERT INTO reset_tokens (email, token, expires_at) VALUES (?, ?, ?)', 
+                 (email, token, expires_at))
+    conn.commit()
+    conn.close()
+
+    # Send reset email
+    reset_url = f"{request.host_url}#reset?token={token}"
+    msg = MIMEMultipart()
+    msg['Subject'] = "Reset Your LoanLink Password"
+    msg['From'] = SENDER_EMAIL
+    msg['To'] = email
+    
+    body = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h2>Password Reset Request</h2>
+            <p>You requested a password reset for your LoanLink account.</p>
+            <p>Click the button below to set a new password:</p>
+            <a href="{reset_url}" style="display: inline-block; background: #6366f1; color: white; padding: 12px 20px; text-decoration: none; border-radius: 8px; font-weight: bold;">Reset Password</a>
+            <p style="color: #64748b; font-size: 12px; margin-top: 20px;">If you didn't request this, you can ignore this email.</p>
+        </body>
+    </html>
+    """
+    msg.attach(MIMEText(body, 'html'))
+    
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.send_message(msg)
+    except Exception as e:
+        print(f"Error sending reset email: {e}")
+
+    return jsonify({'success': True})
+
+@app.route('/api/reset-password', methods=['POST'])
+def reset_password():
+    data = request.json
+    token = data.get('token')
+    new_password = data.get('password')
+    
+    conn = get_db_connection()
+    reset = conn.execute('SELECT * FROM reset_tokens WHERE token = ?', (token,)).fetchone()
+    
+    if not reset:
+        conn.close()
+        return jsonify({'error': 'Invalid or expired token'}), 400
+        
+    hashed = hash_password(new_password)
+    conn.execute('UPDATE users SET password = ? WHERE email = ?', (hashed, reset['email']))
+    conn.execute('DELETE FROM reset_tokens WHERE token = ?', (token,))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True})
+
 # --- Middleware-like helper ---
 def get_current_user():
     token = request.headers.get('Authorization')

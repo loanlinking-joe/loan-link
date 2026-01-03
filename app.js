@@ -5,10 +5,10 @@ const API_URL = '/api';
 // State
 const state = {
     loans: [],
-    view: 'auth', // 'auth', 'dashboard', 'create'
+    view: 'auth', // 'auth', 'dashboard', 'create', 'reset'
     user: JSON.parse(localStorage.getItem('loanLink_user')) || null,
     token: localStorage.getItem('loanLink_token') || null,
-    authMode: 'login' // 'login' or 'signup'
+    authMode: 'login' // 'login', 'signup', or 'forgot'
 };
 
 // Utils
@@ -198,10 +198,13 @@ const navigate = (view) => {
         } else if (window.location.hash === '#login') {
             state.authMode = 'login';
         }
+    } else if (view === 'reset') {
+        const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
+        state.resetToken = urlParams.get('token');
     }
 
     // Guard
-    if (!state.token && view !== 'auth') {
+    if (!state.token && view !== 'auth' && view !== 'reset') {
         state.view = 'auth';
     }
     render();
@@ -261,6 +264,11 @@ const render = () => {
         } else if (state.view === 'archive') {
             const archiveTemplate = document.getElementById('view-archive');
             mainContent.appendChild(archiveTemplate.content.cloneNode(true));
+        } else if (state.view === 'reset') {
+            const resetTemplate = document.getElementById('view-reset-password');
+            appRoot.appendChild(resetTemplate.content.cloneNode(true));
+            initResetListeners();
+            return; // Exit as it's a full-screen view
         }
 
         appRoot.appendChild(layout);
@@ -467,31 +475,83 @@ const initAuthListeners = () => {
             submitBtn.textContent = 'Login';
             switchText.textContent = "Don't have an account?";
             switchBtn.textContent = 'Sign Up';
-        } else {
+            document.getElementById('forgot-password-container').style.display = 'block';
+        } else if (state.authMode === 'signup') {
             title.textContent = 'Create Account';
             nameGroup.style.display = 'block';
             submitBtn.textContent = 'Sign Up';
             switchText.textContent = "Already have an account?";
             switchBtn.textContent = 'Login';
+            document.getElementById('forgot-password-container').style.display = 'none';
+        } else if (state.authMode === 'forgot') {
+            title.textContent = 'Reset Password';
+            nameGroup.style.display = 'none';
+            submitBtn.textContent = 'Send Reset Link';
+            switchText.textContent = "Remembered it?";
+            switchBtn.textContent = 'Login';
+            document.getElementById('auth-email').placeholder = "Enter your email";
+            document.getElementById('auth-password').closest('.form-group').style.display = 'none';
+            document.getElementById('forgot-password-container').style.display = 'none';
         }
     };
     updateUI();
 
-    switchBtn.addEventListener('click', (e) => {
+    document.getElementById('forgot-password-btn').addEventListener('click', (e) => {
         e.preventDefault();
-        state.authMode = state.authMode === 'login' ? 'signup' : 'login';
+        state.authMode = 'forgot';
         updateUI();
     });
 
-    form.addEventListener('submit', (e) => {
+    switchBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (state.authMode === 'forgot') {
+            state.authMode = 'login';
+            document.getElementById('auth-password').closest('.form-group').style.display = 'block';
+        } else {
+            state.authMode = state.authMode === 'login' ? 'signup' : 'login';
+        }
+        updateUI();
+    });
+
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const email = document.getElementById('auth-email').value;
         const password = document.getElementById('auth-password').value;
+
         if (state.authMode === 'login') {
             login(email, password);
-        } else {
+        } else if (state.authMode === 'signup') {
             const name = document.getElementById('auth-name').value;
             register(email, password, name);
+        } else if (state.authMode === 'forgot') {
+            try {
+                await apiRequest('/forgot-password', 'POST', { email });
+                alert('If an account exists for ' + email + ', a reset link has been sent.');
+                state.authMode = 'login';
+                document.getElementById('auth-password').closest('.form-group').style.display = 'block';
+                updateUI();
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+    });
+};
+
+const initResetListeners = () => {
+    const form = document.getElementById('reset-password-form');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const password = document.getElementById('reset-new-password').value;
+        try {
+            await apiRequest('/reset-password', 'POST', {
+                token: state.resetToken,
+                password
+            });
+            alert('Password updated successfully! Please login.');
+            window.location.hash = ''; // Clear token
+            navigate('auth');
+        } catch (err) {
+            alert(err.message);
         }
     });
 };
@@ -825,9 +885,10 @@ document.getElementById('confirm-payment').addEventListener('click', () => {
 
 // Start
 if (state.token) {
-    // Validate token?
     navigate('dashboard');
     fetchLoans();
+} else if (window.location.hash.includes('#reset')) {
+    navigate('reset');
 } else {
     navigate('auth');
 }
