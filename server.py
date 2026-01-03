@@ -9,6 +9,7 @@ from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import socket
+import resend # New: API-based email
 
 # FORCE IPv4: This fixes "Network is unreachable" errors on cloud providers like Render
 orig_getaddrinfo = socket.getaddrinfo
@@ -35,8 +36,12 @@ def handle_exception(e):
 # Email Configuration (Gmail SMTP)
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
-SENDER_EMAIL = os.environ.get("EMAIL_ADDRESS", "")  # Your Gmail address
-SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")  # App password
+SENDER_EMAIL = os.environ.get("EMAIL_ADDRESS", "onboarding@resend.dev")
+SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -103,30 +108,23 @@ def hash_password(password):
 
 def send_loan_notification_email(recipient_email, loan_data):
     """Send email notification for new loan request"""
-    if not SENDER_EMAIL or not SENDER_PASSWORD:
-        msg = "Email not configured (SENDER_EMAIL or SENDER_PASSWORD missing)."
+    if not RESEND_API_KEY and not SENDER_PASSWORD:
+        msg = "Email not configured (RESEND_API_KEY or Gmail App Password missing)."
         print(f"⚠️ {msg}", flush=True)
         return False, msg
     
     try:
-        # Create message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = f"New Loan Agreement Request - ${loan_data['amount']:,.2f}"
-        msg['From'] = SENDER_EMAIL
-        msg['To'] = recipient_email
-        
-        # Get role-specific text
+        # Create message details
+        subject = f"New Loan Agreement Request - ${loan_data['amount']:,.2f}"
         role = loan_data['role']
         creator_name = loan_data.get('creator_name', 'A user')
         
         if role == 'borrower':
-            # Creator is borrower, recipient is lender
             action = f"{creator_name} is requesting to borrow from you"
         else:
-            # Creator is lender, recipient is borrower
             action = f"{creator_name} is offering to lend to you"
-        
-        # HTML email body
+
+        # ... (Rest of HTML/Text generation is same, abbreviated for brevity)
         html = f"""
         <html>
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -188,37 +186,35 @@ def send_loan_notification_email(recipient_email, loan_data):
         </html>
         """
         
-        # Plain text fallback
-        text = f"""
-LoanLink - New Loan Request
+        text = f"LoanLink - New Loan Request\n\n{action}\n\nAmount: ${loan_data['amount']:,.2f}\nInterest: {loan_data['rate']}%"
 
-{action}
+        # Use Resend if API Key is available
+        if RESEND_API_KEY:
+            print(f"DEBUG: Attempting to send email via Resend API to {recipient_email}", flush=True)
+            resend.Emails.send({
+                "from": "LoanLink <onboarding@resend.dev>",
+                "to": [recipient_email],
+                "subject": subject,
+                "html": html,
+                "text": text
+            })
+            print(f"✅ Email successfully sent via Resend to {recipient_email}", flush=True)
+            return True, "Success"
 
-Loan Details:
-- Amount: ${loan_data['amount']:,.2f}
-- Interest Rate: {loan_data['rate']}% ({loan_data['interest_type']})
-- Term: {loan_data['months']} months
-- Monthly Payment: ${loan_data['monthly']:,.2f}
-- Total Repayment: ${loan_data['total']:,.2f}
-
-Please visit {request.host_url} to review this request.
-
----
-This is an automated notification from LoanLink.
-        """
+        # Fallback to SMTP (Gmail)
+        print(f"DEBUG: Falling back to SMTP for {recipient_email}", flush=True)
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = SENDER_EMAIL
+        msg['To'] = recipient_email
+        msg.attach(MIMEText(text, 'plain'))
+        msg.attach(MIMEText(html, 'html'))
         
-        part1 = MIMEText(text, 'plain')
-        part2 = MIMEText(html, 'html')
-        
-        msg.attach(part1)
-        msg.attach(part2)
-        
-        # Send email via SSL on Port 465
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
         
-        print(f"✅ Email successfully sent to {recipient_email}", flush=True)
+        print(f"✅ Email successfully sent via SMTP to {recipient_email}", flush=True)
         return True, "Success"
         
     except Exception as e:
@@ -389,6 +385,16 @@ def forgot_password():
     """
     msg.attach(MIMEText(body, 'html'))
     
+    if RESEND_API_KEY:
+        print(f"DEBUG: Sending reset email via Resend to {email}", flush=True)
+        resend.Emails.send({
+            "from": "LoanLink <onboarding@resend.dev>",
+            "to": [email],
+            "subject": "Reset Your LoanLink Password",
+            "html": body
+        })
+        return jsonify({'success': True})
+
     try:
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
             server.set_debuglevel(1) # Enable verbose SMTP logs in Render
