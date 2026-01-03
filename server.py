@@ -44,7 +44,8 @@ if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=20)
+    conn.execute('PRAGMA journal_mode=WAL')
     c = conn.cursor()
     # Users table
     c.execute('''CREATE TABLE IF NOT EXISTS users (
@@ -114,8 +115,10 @@ def init_db():
     conn.close()
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME, timeout=20)
     conn.row_factory = sqlite3.Row
+    # Enable WAL mode for better concurrency
+    conn.execute('PRAGMA journal_mode=WAL')
     return conn
 
 def hash_password(password):
