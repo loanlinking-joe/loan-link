@@ -27,7 +27,7 @@ def handle_exception(e):
 
 # Email Configuration (Gmail SMTP)
 SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
+SMTP_PORT = 465
 SENDER_EMAIL = os.environ.get("EMAIL_ADDRESS", "")  # Your Gmail address
 SENDER_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")  # App password
 
@@ -206,9 +206,8 @@ This is an automated notification from LoanLink.
         msg.attach(part1)
         msg.attach(part2)
         
-        # Send email
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
-            server.starttls()
+        # Send email via SSL on Port 465
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
         
@@ -350,9 +349,8 @@ def forgot_password():
     msg.attach(MIMEText(body, 'html'))
     
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
+        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
             server.set_debuglevel(1) # Enable verbose SMTP logs in Render
-            server.starttls()
             server.login(SENDER_EMAIL, SENDER_PASSWORD)
             server.send_message(msg)
         print(f"✅ Reset email sent to {email}", flush=True)
