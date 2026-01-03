@@ -100,8 +100,12 @@ const fetchLoans = async () => {
 
 const createLoan = async (loanData) => {
     try {
-        await apiRequest('/loans', 'POST', loanData);
-        alert('Loan proposal sent successfully! The other party needs to accept it.');
+        const res = await apiRequest('/loans', 'POST', loanData);
+        if (res.success === false) {
+            alert('Warning: ' + res.error);
+        } else {
+            alert('Loan proposal sent successfully! The other party needs to accept it.');
+        }
         navigate('dashboard');
         fetchLoans();
     } catch (e) {
