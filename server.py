@@ -44,87 +44,89 @@ if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME, timeout=20)
-    conn.execute('PRAGMA journal_mode=WAL')
-    c = conn.cursor()
-    # Users table
-    c.execute('''CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        name TEXT,
-        token TEXT
-    )''')
-    # Loans table
-    c.execute('''CREATE TABLE IF NOT EXISTS loans (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        lender_email TEXT NOT NULL,
-        borrower_email TEXT NOT NULL,
-        creator_email TEXT,
-        counterparty_name TEXT,
-        amount REAL,
-        rate REAL,
-        months INTEGER,
-        interest_type TEXT,
-        monthly_payment REAL,
-        total_repayment REAL,
-        paid_amount REAL DEFAULT 0,
-        status TEXT DEFAULT 'active',
-        created_at TEXT
-    )''')
-    
-    # Migration: Add creator_email if not exists
+    conn = sqlite3.connect(DB_NAME, timeout=60)
     try:
-        c.execute("ALTER TABLE loans ADD COLUMN creator_email TEXT")
-    except sqlite3.OperationalError:
-        pass # Column likely exists
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA synchronous=NORMAL')
+        c = conn.cursor()
+        
+        # User Table
+        c.execute('''CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            name TEXT,
+            token TEXT,
+            alias TEXT,
+            contact TEXT,
+            dob TEXT
+        )''')
+        
+        # Loan Table
+        c.execute('''CREATE TABLE IF NOT EXISTS loans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lender_email TEXT NOT NULL,
+            borrower_email TEXT NOT NULL,
+            creator_email TEXT,
+            counterparty_name TEXT,
+            amount REAL,
+            rate REAL,
+            months INTEGER,
+            interest_type TEXT,
+            monthly_payment REAL,
+            total_repayment REAL,
+            paid_amount REAL DEFAULT 0,
+            status TEXT DEFAULT 'active',
+            created_at TEXT
+        )''')
 
-    # Migration: Add user profile fields
-    for col in ['alias', 'contact', 'dob']:
+        # Reset Tokens Table
+        c.execute('''CREATE TABLE IF NOT EXISTS reset_tokens (
+            email TEXT PRIMARY KEY,
+            token TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            FOREIGN KEY(email) REFERENCES users(email)
+        )''')
+
+        # Payments Table
+        c.execute('''CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            loan_id INTEGER,
+            amount REAL,
+            date TEXT,
+            FOREIGN KEY(loan_id) REFERENCES loans(id)
+        )''')
+
+        # Migrations
+        # Add profile columns if they don't exist
+        for col in ['alias', 'contact', 'dob']:
+            try:
+                c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError:
+                pass
+
         try:
-            c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
+            c.execute("ALTER TABLE loans ADD COLUMN creator_email TEXT")
         except sqlite3.OperationalError:
             pass
 
-    # Payments/History table (stored as JSON string in original app, but better relational here)
-    # Actually, for simplicity to match frontend "history" array structure, 
-    # we can just store payments in a separate table
-    c.execute('''CREATE TABLE IF NOT EXISTS payments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        loan_id INTEGER,
-        amount REAL,
-        date TEXT,
-        FOREIGN KEY(loan_id) REFERENCES loans(id)
-    )''')
-    
-    # Password reset tokens table
-    c.execute('''CREATE TABLE IF NOT EXISTS reset_tokens (
-        email TEXT PRIMARY KEY,
-        token TEXT NOT NULL,
-        expires_at TEXT NOT NULL,
-        FOREIGN KEY(email) REFERENCES users(email)
-    )''')
-    
-    # Migration: Ensure all emails are lowercase
-    try:
-        conn.execute("UPDATE users SET email = LOWER(email)")
-        conn.execute("UPDATE reset_tokens SET email = LOWER(email)")
-    except Exception:
-        pass
-    
-    conn.commit()
-    conn.close()
+        # Ensure emails are lowercased for stability
+        c.execute("UPDATE users SET email = LOWER(email)")
+        c.execute("UPDATE reset_tokens SET email = LOWER(email)")
+        
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ Warning during init_db: {e}", flush=True)
+    finally:
+        conn.close()
 
 def get_db_connection():
-    # Increase timeout significantly for cloud environments
-    conn = sqlite3.connect(DB_NAME, timeout=30)
+    conn = sqlite3.connect(DB_NAME, timeout=60)
     conn.row_factory = sqlite3.Row
     try:
-        # WAL mode is the most robust way to handle concurrent access in SQLite
         conn.execute('PRAGMA journal_mode=WAL')
-        conn.execute('PRAGMA synchronous=NORMAL')
-    except sqlite3.OperationalError:
-        # If the database is super busy, just proceed and let the timeout handle it
+        conn.execute('PRAGMA busy_timeout=60000')
+    except:
         pass
     return conn
 
