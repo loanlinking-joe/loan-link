@@ -115,10 +115,16 @@ def init_db():
     conn.close()
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_NAME, timeout=20)
+    # Increase timeout significantly for cloud environments
+    conn = sqlite3.connect(DB_NAME, timeout=30)
     conn.row_factory = sqlite3.Row
-    # Enable WAL mode for better concurrency
-    conn.execute('PRAGMA journal_mode=WAL')
+    try:
+        # WAL mode is the most robust way to handle concurrent access in SQLite
+        conn.execute('PRAGMA journal_mode=WAL')
+        conn.execute('PRAGMA synchronous=NORMAL')
+    except sqlite3.OperationalError:
+        # If the database is super busy, just proceed and let the timeout handle it
+        pass
     return conn
 
 def hash_password(password):
