@@ -40,6 +40,17 @@ def debug_users():
     conn.close()
     return jsonify([u['email'] for u in users])
 
+@app.route('/api/admin/reset')
+def admin_reset_user():
+    email = request.args.get('email', '').lower().strip()
+    if not email: return "Missing email", 400
+    conn = get_db_connection()
+    conn.execute('DELETE FROM users WHERE email = ?', (email,))
+    conn.execute('DELETE FROM reset_tokens WHERE email = ?', (email,))
+    conn.commit()
+    conn.close()
+    return f"User {email} deleted. You can now register it fresh."
+
 # Email Configuration (Gmail SMTP)
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
