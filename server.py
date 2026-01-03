@@ -205,16 +205,21 @@ def send_loan_notification_email(recipient_email, loan_data):
 
         # Use Resend if API Key is available
         if RESEND_API_KEY:
-            print(f"DEBUG: Attempting to send email via Resend API to {recipient_email}", flush=True)
-            r = resend.Emails.send({
-                "from": "LoanLink <onboarding@resend.dev>",
-                "to": [recipient_email],
-                "subject": subject,
-                "html": html,
-                "text": text
-            })
-            print(f"✅ Email successfully sent via Resend to {recipient_email}. ID: {r.get('id')}", flush=True)
-            return True, "Success"
+            try:
+                print(f"DEBUG: Attempting to send email via Resend API to {recipient_email}", flush=True)
+                r = resend.Emails.send({
+                    "from": "LoanLink <onboarding@resend.dev>",
+                    "to": [recipient_email],
+                    "subject": subject,
+                    "html": html,
+                    "text": text
+                })
+                print(f"✅ Email successfully sent via Resend to {recipient_email}. ID: {r.get('id')}", flush=True)
+                return True, "Success"
+            except Exception as e:
+                error_msg = f"Resend API Error: {str(e)}"
+                print(f"❌ {error_msg}", flush=True)
+                return False, error_msg
 
         # Fallback to SMTP (Gmail)
         print(f"DEBUG: Falling back to SMTP for {recipient_email}", flush=True)
@@ -401,15 +406,19 @@ def forgot_password():
     msg.attach(MIMEText(body, 'html'))
     
     if RESEND_API_KEY:
-        print(f"DEBUG: Sending reset email via Resend to {email}", flush=True)
-        r = resend.Emails.send({
-            "from": "LoanLink <onboarding@resend.dev>",
-            "to": [email],
-            "subject": "Reset Your LoanLink Password",
-            "html": body
-        })
-        print(f"✅ Reset email sent via Resend. ID: {r.get('id')}", flush=True)
-        return jsonify({'success': True})
+        try:
+            print(f"DEBUG: Sending reset email via Resend to {email}", flush=True)
+            r = resend.Emails.send({
+                "from": "LoanLink <onboarding@resend.dev>",
+                "to": [email],
+                "subject": "Reset Your LoanLink Password",
+                "html": body
+            })
+            print(f"✅ Reset email sent via Resend. ID: {r.get('id')}", flush=True)
+            return jsonify({'success': True})
+        except Exception as e:
+            print(f"❌ Resend API Error: {str(e)}", flush=True)
+            return jsonify({'error': 'Failed to send reset link', 'details': str(e)}), 500
 
     try:
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
