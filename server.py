@@ -372,9 +372,8 @@ def forgot_password():
     user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
     
     if not user:
-        # For security, don't reveal if user exists. Just say "If account exists, email sent"
         conn.close()
-        return jsonify({'success': True})
+        return jsonify({'error': 'No user found with that email. Did the database restart?'}), 404
 
     # Generate token
     token = str(uuid.uuid4())
