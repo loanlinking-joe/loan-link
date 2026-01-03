@@ -97,8 +97,9 @@ def hash_password(password):
 def send_loan_notification_email(recipient_email, loan_data):
     """Send email notification for new loan request"""
     if not SENDER_EMAIL or not SENDER_PASSWORD:
-        print("⚠️ Email not configured. Skipping notification.")
-        return False
+        msg = "Email not configured (SENDER_EMAIL or SENDER_PASSWORD missing)."
+        print(f"⚠️ {msg}", flush=True)
+        return False, msg
     
     try:
         # Create message
