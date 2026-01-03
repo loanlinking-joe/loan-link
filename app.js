@@ -233,7 +233,11 @@ const navigate = (view) => {
 
 // Initial navigation based on current hash or default
 window.addEventListener('hashchange', () => {
-    if (state.view === 'auth') render();
+    if (window.location.hash.includes('#reset')) {
+        navigate('reset');
+    } else if (state.view === 'auth') {
+        render();
+    }
 });
 
 const render = () => {
@@ -243,8 +247,12 @@ const render = () => {
         const template = document.getElementById('view-auth');
         appRoot.appendChild(template.content.cloneNode(true));
         initAuthListeners();
+    } else if (state.view === 'reset') {
+        const resetTemplate = document.getElementById('view-reset-password');
+        appRoot.appendChild(resetTemplate.content.cloneNode(true));
+        initResetListeners();
     } else {
-        // App Layout
+        // App Layout (Requires state.user to be logged in)
         const layoutTemplate = document.getElementById('layout-app');
         const layout = layoutTemplate.content.cloneNode(true);
 
@@ -285,11 +293,6 @@ const render = () => {
         } else if (state.view === 'archive') {
             const archiveTemplate = document.getElementById('view-archive');
             mainContent.appendChild(archiveTemplate.content.cloneNode(true));
-        } else if (state.view === 'reset') {
-            const resetTemplate = document.getElementById('view-reset-password');
-            appRoot.appendChild(resetTemplate.content.cloneNode(true));
-            initResetListeners();
-            return; // Exit as it's a full-screen view
         }
 
         appRoot.appendChild(layout);
