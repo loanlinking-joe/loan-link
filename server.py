@@ -12,7 +12,18 @@ from flask_cors import CORS
 app = Flask(__name__, static_url_path='', static_folder='.')
 CORS(app)
 
-DB_NAME = "loanlink.db"
+# Absolute path for the database to ensure it works on all platforms
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_NAME = os.path.join(BASE_DIR, "loanlink.db")
+
+# Global error handler to catch crashes and return them as JSON
+@app.errorhandler(Exception)
+def handle_exception(e):
+    print(f"CRITICAL ERROR: {str(e)}", flush=True)
+    return jsonify({
+        "error": "Server Error",
+        "details": str(e)
+    }), 500
 
 # Email Configuration (Gmail SMTP)
 SMTP_SERVER = "smtp.gmail.com"
