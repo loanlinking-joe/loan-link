@@ -257,8 +257,10 @@ const render = () => {
         const layout = layoutTemplate.content.cloneNode(true);
 
         // Sidebar Content
-        layout.getElementById('sidebar-username').textContent = state.user.name || 'User';
-        layout.getElementById('sidebar-email').textContent = state.user.email;
+        const nameEl = layout.getElementById('sidebar-username');
+        const emailEl = layout.getElementById('sidebar-email');
+        if (nameEl && state.user) nameEl.textContent = state.user.name || 'User';
+        if (emailEl && state.user) emailEl.textContent = state.user.email;
 
         // Active Nav State
         const navDash = layout.getElementById('nav-dashboard');
