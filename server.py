@@ -151,10 +151,10 @@ def send_loan_notification_email(recipient_email, loan_data):
                         </p>
                         
                         <div style="margin-top: 25px;">
-                            <a href="http://localhost:8080/#login" style="display: inline-block; background-color: #6366f1; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: #ffffff !important; padding: 12px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-right: 10px; border: 1px solid #6366f1;">
+                            <a href="{request.host_url}#login" style="display: inline-block; background-color: #6366f1; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: #ffffff !important; padding: 12px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-right: 10px; border: 1px solid #6366f1;">
                                 Login to Review →
                             </a>
-                            <a href="http://localhost:8080/#signup" style="display: inline-block; background-color: #ffffff; color: #6366f1 !important; padding: 12px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; border: 1px solid #6366f1;">
+                            <a href="{request.host_url}#signup" style="display: inline-block; background-color: #ffffff; color: #6366f1 !important; padding: 12px 20px; text-decoration: none; border-radius: 8px; font-weight: bold; border: 1px solid #6366f1;">
                                 Create Account
                             </a>
                         </div>
@@ -182,7 +182,7 @@ Loan Details:
 - Monthly Payment: ${loan_data['monthly']:,.2f}
 - Total Repayment: ${loan_data['total']:,.2f}
 
-Please visit http://localhost:8080 to review this request.
+Please visit {request.host_url} to review this request.
 
 ---
 This is an automated notification from LoanLink.
@@ -602,8 +602,10 @@ def delete_loan(loan_id):
 def index():
     return send_from_directory('.', 'index.html')
 
+# Professional initialization
+init_db()
+print("✅ LoanLink Database Initialized.", flush=True)
+
 if __name__ == '__main__':
-    init_db()
     port = int(os.environ.get('PORT', 8080))
-    # Bind to 0.0.0.0 so it's accessible externally if needed, or just localhost
     app.run(host='0.0.0.0', port=port, debug=True)
