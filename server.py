@@ -5,7 +5,7 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import socket
@@ -377,9 +377,9 @@ def forgot_password():
 
     # Generate token
     token = str(uuid.uuid4())
-    expires_at = datetime.now().isoformat() # In a real app, add +1 hour. For now, simple.
+    expires_at = (datetime.now() + timedelta(hours=24)).isoformat()
     
-    conn.execute('INSERT INTO reset_tokens (email, token, expires_at) VALUES (?, ?, ?)', 
+    conn.execute('INSERT OR REPLACE INTO reset_tokens (email, token, expires_at) VALUES (?, ?, ?)', 
                  (email, token, expires_at))
     conn.commit()
     conn.close()
