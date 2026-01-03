@@ -95,6 +95,15 @@ def init_db():
         date TEXT,
         FOREIGN KEY(loan_id) REFERENCES loans(id)
     )''')
+    
+    # Password reset tokens table
+    c.execute('''CREATE TABLE IF NOT EXISTS reset_tokens (
+        email TEXT PRIMARY KEY,
+        token TEXT NOT NULL,
+        expires TEXT NOT NULL,
+        FOREIGN KEY(email) REFERENCES users(email)
+    )''')
+    
     conn.commit()
     conn.close()
 
