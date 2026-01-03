@@ -100,9 +100,15 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS reset_tokens (
         email TEXT PRIMARY KEY,
         token TEXT NOT NULL,
-        expires TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
         FOREIGN KEY(email) REFERENCES users(email)
     )''')
+    
+    # Migration: Add expires_at to reset_tokens if it was created with 'expires'
+    try:
+        c.execute("ALTER TABLE reset_tokens ADD COLUMN expires_at TEXT")
+    except sqlite3.OperationalError:
+        pass # Column likely exists
     
     conn.commit()
     conn.close()
