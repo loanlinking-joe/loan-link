@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoanLink - Smart Loan Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Ionicons for Icons -->
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
+</head>
+
+<body>
+    <div id="app-root">
+        <!-- Auth View is inserted here directly if not logged in -->
+    </div>
+
+    <!-- Templates -->
+
+    <!-- 1. Auth View -->
+    <template id="view-auth">
+        <div class="auth-wrapper">
+            <section class="glass-panel" style="width: 100%; max-width: 400px; padding: 40px;">
+                <div class="text-center" style="margin-bottom: 30px;">
+                    <div class="brand-icon" style="margin: 0 auto 20px auto;">LL</div>
+                    <h2 id="auth-title">Welcome Back</h2>
+                    <p style="color: var(--text-secondary);">Manage your loans with clarity.</p>
+                </div>
+
+                <form id="auth-form">
+                    <div class="form-group" id="name-group" style="display: none;">
+                        <input type="text" id="auth-name" class="form-input" placeholder="Full Name">
+                    </div>
+                    <div class="form-group">
+                        <input type="email" id="auth-email" class="form-input" placeholder="Email Address" required>
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="auth-password" class="form-input" placeholder="Password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%;" id="auth-submit">Login</button>
+                </form>
+
+                <div class="text-center mt-4">
+                    <span id="auth-switch-text" style="color: var(--text-secondary);">Don't have an account?</span>
+                    <a href="#" id="auth-switch-btn"
+                        style="color: #818cf8; font-weight: 600; text-decoration: none; margin-left: 5px;">Sign Up</a>
+                </div>
+            </section>
+        </div>
+    </template>
+
+    <!-- 2. Main App Layout (Shell) -->
+    <template id="layout-app">
+        <div class="app-layout">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div>
+                    <div class="brand">
+                        <div class="brand-icon">LL</div>
+                        <h1>LoanLink</h1>
+                    </div>
+
+                    <nav class="nav-links">
+                        <a class="nav-item active" id="nav-dashboard">
+                            <ion-icon name="grid-outline"></ion-icon>
+                            <span>Overview</span>
+                        </a>
+                        <a class="nav-item" id="nav-create">
+                            <ion-icon name="add-circle-outline"></ion-icon>
+                            <span>New Agreement</span>
+                        </a>
+                        <a class="nav-item" id="nav-archive">
+                            <ion-icon name="archive-outline"></ion-icon>
+                            <span>Archive</span>
+                        </a>
+                        <a class="nav-item" id="nav-profile">
+                            <ion-icon name="person-outline"></ion-icon>
+                            <span>Profile</span>
+                        </a>
+                    </nav>
+                </div>
+
+                <div>
+                    <div class="user-profile" id="user-profile-display">
+                        <div class="user-avatar"></div>
+                        <div class="user-info">
+                            <div id="sidebar-username">User</div>
+                            <div id="sidebar-email">email@example.com</div>
+                        </div>
+                    </div>
+                    <a class="nav-item" id="nav-logout" style="margin-top: 10px; color: var(--danger);">
+                        <ion-icon name="log-out-outline"></ion-icon>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="main-content" id="main-content-area">
+                <!-- Views injected here -->
+            </main>
+        </div>
+    </template>
+
+    <!-- 3. Dashboard View -->
+    <template id="view-dashboard">
+        <div class="page-header">
+            <h2 class="page-title" id="welcome-header">Dashboard</h2>
+            <p class="page-subtitle">Here's what's happening with your loans.</p>
+        </div>
+
+        <section class="dashboard-grid">
+            <div class="glass-panel stat-card">
+                <h3>Total I Owe</h3>
+                <div class="stat-value negative" id="total-owed">$0.00</div>
+            </div>
+            <div class="glass-panel stat-card">
+                <h3>Total Owed to Me</h3>
+                <div class="stat-value positive" id="total-lent">$0.00</div>
+            </div>
+        </section>
+
+        <!-- Pending Section -->
+        <section id="pending-section" class="hidden">
+            <div class="section-header">
+                <h3 class="section-title">Pending Requests <span
+                        style="background: var(--warning); color: black; font-size: 0.7em; padding: 2px 8px; border-radius: 10px; margin-left: 8px;">Action
+                        Required</span></h3>
+            </div>
+            <div class="loan-list" id="pending-container">
+                <!-- Items -->
+            </div>
+        </section>
+
+        <!-- Active Section -->
+        <div class="section-header">
+            <h3 class="section-title">Active Loans</h3>
+            <!-- Filter or View All link -->
+        </div>
+        <div class="loan-list" id="active-container">
+            <!-- Items -->
+            <div class="glass-panel text-center" style="opacity: 0.6; padding: 40px;">
+                <p>No active loans. Start by creating a new agreement.</p>
+            </div>
+        </div>
+        <!-- Completed section moved to Archive view -->
+    </template>
+
+    <!-- Archive View -->
+    <template id="view-archive">
+        <div class="page-header">
+            <h2 class="page-title">Archive</h2>
+            <p class="page-subtitle">History of completed and settled loans.</p>
+        </div>
+
+        <div class="loan-list" id="archive-container">
+            <!-- Items -->
+            <div class="glass-panel text-center" style="opacity: 0.6; padding: 40px;">
+                <p>No archived loans found.</p>
+            </div>
+        </div>
+    </template>
+
+    <!-- 4. Create View -->
+    <template id="view-create">
+        <div class="page-header">
+            <h2 class="page-title">New Agreement</h2>
+            <p class="page-subtitle">Draft a new loan proposal to send to another party.</p>
+        </div>
+
+        <div class="glass-panel" style="max-width: 700px;">
+            <form id="create-loan-form">
+                <div class="form-group" style="margin-bottom: 24px;">
+                    <label style="display: block; margin-bottom: 12px; color: var(--text-secondary);">Your Role</label>
+                    <div style="display: flex; gap: 10px;">
+                        <label class="btn btn-secondary" style="flex: 1; text-align: center;">
+                            <input type="radio" name="role" value="borrower" checked style="display:none;">
+                            I am Borrowing
+                        </label>
+                        <label class="btn btn-secondary" style="flex: 1; text-align: center;">
+                            <input type="radio" name="role" value="lender" style="display:none;">
+                            I am Lending
+                        </label>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Counterparty
+                            Email</label>
+                        <input type="email" id="counterparty-email" class="form-input" placeholder="friend@example.com"
+                            required>
+                    </div>
+                    <div class="form-group">
+                        <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Amount
+                            ($)</label>
+                        <input type="number" id="amount" class="form-input" placeholder="1000" min="1" step="0.01"
+                            required>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Interest Rate
+                            (%)</label>
+                        <input type="number" id="interest" class="form-input" value="0" min="0" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Type</label>
+                        <select id="interest-type" class="form-input">
+                            <option value="simple">Simple</option>
+                            <option value="compound">Compound</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Months</label>
+                        <input type="number" id="tenure" class="form-input" value="12" min="1" max="60">
+                    </div>
+                </div>
+
+                <div
+                    style="background: rgba(99, 102, 241, 0.1); padding: 20px; border-radius: var(--radius-md); margin: 20px 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span>Monthly Payment:</span>
+                        <span id="preview-monthly" style="font-weight: 700; color: var(--success);">$0.00</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Total Repayment:</span>
+                        <span id="preview-total" style="font-weight: 700; color: var(--success);">$0.00</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Alias Name</label>
+                    <input type="text" id="counterparty" class="form-input" placeholder="e.g. John (for your reference)"
+                        required>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px;">
+                    <button type="button" id="create-cancel" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Send Proposal</button>
+                </div>
+            </form>
+        </div>
+    </template>
+
+    <!-- 5. Profile View -->
+    <template id="view-profile">
+        <div class="page-header">
+            <h2 class="page-title">Your Profile</h2>
+            <p class="page-subtitle">Manage your personal information.</p>
+        </div>
+
+        <div class="glass-panel" style="max-width: 600px;">
+            <form id="profile-form">
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Full
+                        Name</label>
+                    <input type="text" id="profile-name" class="form-input" placeholder="Your Name" required>
+                </div>
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Alias /
+                        Nickname</label>
+                    <input type="text" id="profile-alias" class="form-input"
+                        placeholder="Calculates to 'Alias Name' in loans">
+                    <p style="font-size:0.8em; color:var(--text-secondary); margin-top:4px;">This name will be
+                        visible to others if you provide it.</p>
+                </div>
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Contact
+                        Number</label>
+                    <input type="text" id="profile-contact" class="form-input" placeholder="+1 234 567 890">
+                </div>
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Date of
+                        Birth</label>
+                    <input type="date" id="profile-dob" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Email</label>
+                    <input type="email" id="profile-email" class="form-input" disabled style="opacity: 0.5;">
+                </div>
+
+                <div style="display: flex; gap: 12px; margin-top: 24px;">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </template>
+
+    <!-- Modals -->
+
+    <!-- Pending Loan Review Modal -->
+    <div id="review-modal" class="modal hidden"
+        style="position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 100;">
+        <div class="glass-panel" style="width: 90%; max-width: 500px; background: #1e293b;">
+            <h3 style="margin-bottom: 20px;">Review Loan Proposal</h3>
+            <div id="review-content" style="margin-bottom: 24px; line-height: 1.6;">
+                <!-- Filled dynamically -->
+            </div>
+
+            <div
+                style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 8px; margin-bottom: 24px; font-size: 0.9em;">
+                <p><strong>Terms & Conditions:</strong></p>
+                <p>By accepting this loan, you agree to the repayment schedule outlined above. Both parties
+                    acknowledge
+                    this is a digital record of a mutual agreement.</p>
+            </div>
+
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="reject-btn" class="btn btn-danger">Reject</button>
+                <button id="accept-btn" class="btn btn-primary">Accept & Activate</button>
+            </div>
+            <button id="close-review"
+                style="position: absolute; top: 16px; right: 16px; background: none; border: none; color: white; cursor: pointer; font-size: 1.5rem;">&times;</button>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="payment-modal" class="modal hidden"
+        style="position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 100;">
+        <div class="glass-panel" style="width: 90%; max-width: 400px; background: #1e293b;">
+            <h3 style="margin-bottom: 20px;">Record Payment</h3>
+            <div class="form-group">
+                <input type="number" id="payment-amount" class="form-input" placeholder="Amount ($)" step="0.01">
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button id="cancel-payment" class="btn btn-secondary">Cancel</button>
+                <button id="confirm-payment" class="btn btn-primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loan Details Modal -->
+    <div id="details-modal" class="modal hidden"
+        style="position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 100;">
+        <div class="glass-panel"
+            style="width: 95%; max-width: 800px; max-height: 90vh; background: #1e293b; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 id="details-title" style="margin: 0;">Loan Details</h3>
+                <button id="close-details"
+                    style="background: none; border: none; color: white; cursor: pointer; font-size: 1.5rem;">&times;</button>
+            </div>
+
+            <div class="dashboard-grid" style="margin-bottom: 24px;">
+                <div class="glass-panel stat-card" style="padding: 16px;">
+                    <h4 style="font-size: 0.9em; color: var(--text-secondary);">Total Repayment</h4>
+                    <div class="stat-value" id="details-total" style="font-size: 1.5em;">$0.00</div>
+                </div>
+                <div class="glass-panel stat-card" style="padding: 16px;">
+                    <h4 style="font-size: 0.9em; color: var(--text-secondary);">Paid So Far</h4>
+                    <div class="stat-value text-accent" id="details-paid" style="font-size: 1.5em;">$0.00</div>
+                </div>
+                <div class="glass-panel stat-card" style="padding: 16px;">
+                    <h4 style="font-size: 0.9em; color: var(--text-secondary);">Remaining</h4>
+                    <div class="stat-value" id="details-remaining" style="font-size: 1.5em;">$0.00</div>
+                </div>
+            </div>
+
+            <!-- Chart Section -->
+            <div style="background: rgba(0,0,0,0.2); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+                <canvas id="details-chart" height="200"></canvas>
+            </div>
+
+            <!-- History List -->
+            <h4 style="margin-bottom: 12px;">Payment History</h4>
+            <div id="details-history-list" style="display: flex; flex-direction: column; gap: 8px;">
+                <!-- Items -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>
