@@ -105,11 +105,12 @@ def init_db():
         FOREIGN KEY(email) REFERENCES users(email)
     )''')
     
-    # Migration: Add expires_at to reset_tokens if it was created with 'expires'
+    # Migration: Ensure all emails are lowercase
     try:
-        c.execute("ALTER TABLE reset_tokens ADD COLUMN expires_at TEXT")
-    except sqlite3.OperationalError:
-        pass # Column likely exists
+        conn.execute("UPDATE users SET email = LOWER(email)")
+        conn.execute("UPDATE reset_tokens SET email = LOWER(email)")
+    except Exception:
+        pass
     
     conn.commit()
     conn.close()
@@ -356,7 +357,7 @@ def login():
     password = data.get('password')
     
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+    user = conn.execute('SELECT * FROM users WHERE email = ? COLLATE NOCASE', (email,)).fetchone()
     conn.close()
     
     if user and user['password'] == hash_password(password):
@@ -381,7 +382,7 @@ def forgot_password():
     print(f"DEBUG: Forgot password request for: {email}", flush=True)
     
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
+    user = conn.execute('SELECT * FROM users WHERE email = ? COLLATE NOCASE', (email,)).fetchone()
     
     if not user:
         conn.close()
