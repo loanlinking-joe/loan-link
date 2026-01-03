@@ -8,6 +8,13 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+import socket
+
+# FORCE IPv4: This fixes "Network is unreachable" errors on cloud providers like Render
+orig_getaddrinfo = socket.getaddrinfo
+def getaddrinfo_ipv4(host, port, family=0, type=0, proto=0, flags=0):
+    return orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+socket.getaddrinfo = getaddrinfo_ipv4
 
 app = Flask(__name__, static_url_path='', static_folder='.')
 CORS(app)
