@@ -171,6 +171,22 @@ const updateProfile = async (profileData) => {
     }
 };
 
+const changePassword = async (oldPassword, newPassword) => {
+    try {
+        const res = await apiRequest('/change-password', 'POST', {
+            old_password: oldPassword,
+            new_password: newPassword
+        });
+        if (res.success) {
+            alert('Password changed successfully!');
+            document.getElementById('current-password').value = '';
+            document.getElementById('new-password').value = '';
+        }
+    } catch (e) {
+        alert("Failed to change password: " + e.message);
+    }
+};
+
 window.cancelLoan = async (id) => {
     if (!confirm("Are you sure you want to cancel this loan request?")) return;
     try {
@@ -317,6 +333,19 @@ const initProfileListeners = async () => {
             dob: document.getElementById('profile-dob').value
         };
         updateProfile(updatedData);
+    });
+
+    document.getElementById('change-password-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const oldPass = document.getElementById('current-password').value;
+        const newPass = document.getElementById('new-password').value;
+
+        if (newPass.length < 6) {
+            alert("New password must be at least 6 characters long.");
+            return;
+        }
+
+        changePassword(oldPass, newPass);
     });
 };
 

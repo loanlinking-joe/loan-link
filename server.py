@@ -428,6 +428,28 @@ def reset_password():
     
     return jsonify({'success': True})
 
+@app.route('/api/change-password', methods=['POST'])
+def change_password():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    data = request.json
+    old_password = data.get('old_password')
+    new_password = data.get('new_password')
+    
+    # Verify old password
+    if hash_password(old_password) != user['password']:
+        return jsonify({'error': 'Incorrect current password'}), 400
+        
+    conn = get_db_connection()
+    conn.execute('UPDATE users SET password = ? WHERE email = ?', 
+                 (hash_password(new_password), user['email']))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True})
+
 # --- Middleware-like helper ---
 def get_current_user():
     token = request.headers.get('Authorization')
