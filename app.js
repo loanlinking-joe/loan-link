@@ -445,6 +445,17 @@ const renderMarketplace = async () => {
                     <ion-icon name="time-outline"></ion-icon>
                     <span>${listing.tenure || 'Flexible'} Month(s) Tenure</span>
                 </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Loan Date</label>
+                        <input type="date" id="loan-start-date" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Starts On</label>
+                        <input type="date" id="repayment-start-date" class="form-input">
+                    </div>
+                </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <ion-icon name="person-outline"></ion-icon>
                     <span>Posted by: ${listing.owner_alias || listing.owner_name || listing.user_email}</span>
@@ -988,6 +999,8 @@ const initCreateListeners = () => {
             months: parseInt(document.getElementById('tenure').value),
             interestType: document.getElementById('interest-type').value,
             paymentFrequency: document.getElementById('payment-frequency').value,
+            loanDate: document.getElementById('loan-start-date').value,
+            repaymentStartDate: document.getElementById('repayment-start-date').value,
             monthly,
             total
         };
@@ -1111,11 +1124,13 @@ window.openLoanDetails = (id) => {
     document.getElementById('details-paid').textContent = formatMoney(loan.paid);
     document.getElementById('details-remaining').textContent = formatMoney(loan.total - loan.paid);
 
-    // If item, add item details to the modal?
-    if (isItem) {
-        const historyHeader = document.querySelector('#details-history-list').previousElementSibling;
-        const itemInfoDivId = 'details-item-info';
-        let itemInfoDiv = document.getElementById(itemInfoDivId);
+    // If item or currency, we show the extra details block now for dates
+    const historyHeader = document.querySelector('#details-history-list').previousElementSibling;
+    const itemInfoDivId = 'details-item-info';
+    let itemInfoDiv = document.getElementById(itemInfoDivId);
+
+    // Always show this block logic
+    if (true) {
         if (!itemInfoDiv) {
             itemInfoDiv = document.createElement('div');
             itemInfoDiv.id = itemInfoDivId;
@@ -1126,11 +1141,16 @@ window.openLoanDetails = (id) => {
             historyHeader.parentNode.insertBefore(itemInfoDiv, historyHeader);
         }
         itemInfoDiv.innerHTML = `
-            <h4 style="margin-top:0; margin-bottom:10px; color:var(--text-secondary);">Item Details</h4>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:10px;">
+                 <div><span style="color:var(--text-secondary); font-size:0.9em;">Loan Date</span> <br><strong>${loan.loan_date || 'N/A'}</strong></div>
+                 <div><span style="color:var(--text-secondary); font-size:0.9em;">Payment Start</span> <br><strong>${loan.repayment_start_date || 'N/A'}</strong></div>
+            </div>
+            ${isItem ? `
+            <h4 style="margin-top:10px; margin-bottom:10px; color:var(--text-secondary);">Item Details</h4>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
                 <div><span style="color:var(--text-secondary); font-size:0.9em;">Condition:</span> <br><strong>${loan.item_condition || 'N/A'}</strong></div>
                 <div><span style="color:var(--text-secondary); font-size:0.9em;">Description:</span> <br><strong>${loan.item_description || 'N/A'}</strong></div>
-            </div>
+            </div>` : ''}
         `;
     } else {
         const itemInfoDiv = document.getElementById('details-item-info');

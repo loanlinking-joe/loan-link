@@ -161,6 +161,12 @@ def init_db():
 
         try: c.execute("ALTER TABLE payments ADD COLUMN proof_image TEXT")
         except: pass
+
+        try: c.execute("ALTER TABLE loans ADD COLUMN loan_date TEXT")
+        except: pass
+
+        try: c.execute("ALTER TABLE loans ADD COLUMN repayment_start_date TEXT")
+        except: pass
         
         # Ensure asset_type defaults to currency if null
         c.execute("UPDATE loans SET asset_type = 'currency' WHERE asset_type IS NULL")
@@ -260,6 +266,14 @@ def send_loan_notification_email(recipient_email, loan_data):
                                 <tr>
                                     <td style="padding: 10px; color: #64748b;">Term:</td>
                                     <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data['months']} months</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; color: #64748b;">Loan Date:</td>
+                                    <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data.get('loan_date', 'N/A')}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; color: #64748b;">Start Payment:</td>
+                                    <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data.get('repayment_start_date', 'N/A')}</td>
                                 </tr>
                                 <tr style="border-top: 2px solid #e2e8f0;">
                                     <td style="padding: 10px; color: #64748b;">{"Monthly Fee" if loan_data.get('asset_type') == 'item' else "Monthly Payment"}:</td>
@@ -664,6 +678,8 @@ def create_loan():
     item_description = data.get('itemDescription')
     item_condition = data.get('itemCondition')
     payment_frequency = data.get('paymentFrequency', 'Monthly')
+    loan_date = data.get('loanDate')
+    repayment_start_date = data.get('repaymentStartDate')
     
     # Determine who is who
     if role == 'lender':
@@ -683,13 +699,13 @@ def create_loan():
     conn = get_db_connection()
     c = conn.cursor()
     c.execute('''
-        INSERT INTO loans (lender_email, borrower_email, creator_email, counterparty_name, asset_type, item_name, item_description, item_condition, amount, rate, months, interest_type, monthly_payment, total_repayment, created_at, status, payment_frequency)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
-    ''', (lender_email, borrower_email, creator_email, counterparty_name, asset_type, item_name, item_description, item_condition, amount, rate, months, type, monthly, total, created_at, payment_frequency))
+        INSERT INTO loans (lender_email, borrower_email, creator_email, counterparty_name, asset_type, item_name, item_description, item_condition, amount, rate, months, interest_type, monthly_payment, total_repayment, created_at, status, payment_frequency, loan_date, repayment_start_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+    ''', (lender_email, borrower_email, creator_email, counterparty_name, asset_type, item_name, item_description, item_condition, amount, rate, months, type, monthly, total, created_at, payment_frequency, loan_date, repayment_start_date))
     conn.commit()
     conn.close()
     
-    # Send email notification to counterparty
+    # Send email notification to counterpartyl
     email_data = {
         'asset_type': asset_type,
         'item_name': item_name,
@@ -703,6 +719,8 @@ def create_loan():
         'total': total,
         'role': role,
         'payment_frequency': payment_frequency,
+        'loan_date': loan_date,
+        'repayment_start_date': repayment_start_date,
         'creator_name': user['name'] if user['name'] else user['email']
     }
     
