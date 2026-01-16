@@ -857,13 +857,17 @@ const initCreateListeners = () => {
                 parent.classList.remove('btn-secondary');
                 parent.classList.add('btn-primary');
 
-                // Update Label Text based on checked role
+                // Update Icon/Labels based on checked role
                 const label = document.getElementById('counterparty-label');
+                const nameLabel = document.getElementById('counterparty-name-label');
+
                 if (label) {
                     if (r.value === 'borrower') {
                         label.textContent = "Lender's Email";
+                        if (nameLabel) nameLabel.textContent = "Lender's Name";
                     } else {
                         label.textContent = "Borrower's Email";
+                        if (nameLabel) nameLabel.textContent = "Borrower's Name";
                     }
                 }
             } else {
