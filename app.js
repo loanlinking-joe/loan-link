@@ -1290,6 +1290,15 @@ document.getElementById('confirm-payment').addEventListener('click', () => {
     const date = document.getElementById('payment-date').value;
 
     if (amount > 0 && currentPaymentLoanId) {
+        const loan = state.loans.find(l => l.id === currentPaymentLoanId);
+        if (loan) {
+            const remaining = loan.total - loan.paid;
+            // Use a small epsilon for float comparison safety
+            if (amount > remaining + 0.01) {
+                alert(`Caution: Payment amount ($${amount.toFixed(2)}) exceeds the remaining balance ($${remaining.toFixed(2)}). Please adjust the amount.`);
+                return;
+            }
+        }
         recordPayment(currentPaymentLoanId, amount, method, date);
     } else {
         alert("Please enter a valid amount.");
