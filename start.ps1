@@ -2,8 +2,8 @@
 # Run this to start the server with email notifications enabled
 
 # Set email credentials
-$env:EMAIL_ADDRESS = "loan.linking@gmail.com"
-$env:EMAIL_PASSWORD = "your-new-app-password-here"
+$env:EMAIL_ADDRESS = "loanlinking@gmail.com"
+$env:EMAIL_PASSWORD = "vfpm kyvs hwxa iykh"
 
 # Start the server
 Write-Host "Starting LoanLink server with email notifications..." -ForegroundColor Green

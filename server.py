@@ -40,16 +40,20 @@ def debug_users():
     conn.close()
     return jsonify([u['email'] for u in users])
 
-@app.route('/api/admin/reset')
-def admin_reset_user():
-    email = request.args.get('email', '').lower().strip()
-    if not email: return "Missing email", 400
-    conn = get_db_connection()
-    conn.execute('DELETE FROM users WHERE email = ?', (email,))
-    conn.execute('DELETE FROM reset_tokens WHERE email = ?', (email,))
-    conn.commit()
-    conn.close()
-    return f"User {email} deleted. You can now register it fresh."
+@app.route('/api/admin/nuke-database')
+def nuke_database():
+    try:
+        if os.path.exists(DB_NAME):
+            # Close any active connections if possible (not really possible here globally, but os.remove will try)
+            os.remove(DB_NAME)
+            # Re-init immediately
+            init_db()
+            return "💥 Database Nuked. Everything is fresh. Go to Signup now!"
+        else:
+            init_db()
+            return "Database didn't exist, but I've initialized it anyway."
+    except Exception as e:
+        return f"Error during nuke: {str(e)}"
 
 # Email Configuration (Gmail SMTP)
 SMTP_SERVER = "smtp.gmail.com"
@@ -89,6 +93,10 @@ def init_db():
             borrower_email TEXT NOT NULL,
             creator_email TEXT,
             counterparty_name TEXT,
+            asset_type TEXT DEFAULT 'currency',
+            item_name TEXT,
+            item_description TEXT,
+            item_condition TEXT,
             amount REAL,
             rate REAL,
             months INTEGER,
@@ -117,13 +125,34 @@ def init_db():
             FOREIGN KEY(loan_id) REFERENCES loans(id)
         )''')
 
+        # Listings (Marketplace) Table
+        c.execute('''CREATE TABLE IF NOT EXISTS listings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_email TEXT NOT NULL,
+            item_name TEXT NOT NULL,
+            description TEXT,
+            charge REAL,
+            deposit REAL,
+            location TEXT,
+            tenure INTEGER,
+            status TEXT DEFAULT 'active',
+            created_at TEXT
+        )''')
+
         # Migrations (Safe multi-run)
         for col in ['alias', 'contact', 'dob']:
             try: c.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT")
             except: pass
 
-        try: c.execute("ALTER TABLE loans ADD COLUMN creator_email TEXT")
+        for col in ['creator_email', 'asset_type', 'item_name', 'item_description', 'item_condition']:
+            try: c.execute(f"ALTER TABLE loans ADD COLUMN {col} TEXT")
+            except: pass
+            
+        try: c.execute("ALTER TABLE payments ADD COLUMN method TEXT")
         except: pass
+        
+        # Ensure asset_type defaults to currency if null
+        c.execute("UPDATE loans SET asset_type = 'currency' WHERE asset_type IS NULL")
 
         # Ensure ALL emails are lowercased for stability (running every time for safety)
         c.execute("UPDATE users SET email = LOWER(email)")
@@ -162,7 +191,10 @@ def send_loan_notification_email(recipient_email, loan_data):
     
     try:
         # Create message details
-        subject = f"New Loan Agreement Request - ${loan_data['amount']:,.2f}"
+        if loan_data.get('asset_type') == 'item':
+            subject = f"New Loan Agreement Request - {loan_data['item_name']}"
+        else:
+            subject = f"New Loan Agreement Request - ${loan_data['amount']:,.2f}"
         role = loan_data['role']
         creator_name = loan_data.get('creator_name', 'A user')
         
@@ -187,10 +219,29 @@ def send_loan_notification_email(recipient_email, loan_data):
                         
                         <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
                             <table style="width: 100%; border-collapse: collapse;">
+                                {"""
+                                <tr>
+                                    <td style="padding: 10px; color: #64748b;">Item:</td>
+                                    <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data['item_name']}</td>
+                                </tr>
+                                """ if loan_data.get('asset_type') == 'item' else f"""
                                 <tr>
                                     <td style="padding: 10px; color: #64748b;">Amount:</td>
                                     <td style="padding: 10px; font-weight: bold; text-align: right;">${loan_data['amount']:,.2f}</td>
                                 </tr>
+                                """}
+                                {"""
+                                <tr>
+                                    <td style="padding: 10px; color: #64748b;">Description:</td>
+                                    <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data['item_description']}</td>
+                                </tr>
+                                """ if loan_data.get('asset_type') == 'item' and loan_data.get('item_description') else ""}
+                                {"""
+                                <tr>
+                                    <td style="padding: 10px; color: #64748b;">Condition:</td>
+                                    <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data['item_condition']}</td>
+                                </tr>
+                                """ if loan_data.get('asset_type') == 'item' and loan_data.get('item_condition') else ""}
                                 <tr>
                                     <td style="padding: 10px; color: #64748b;">Interest Rate:</td>
                                     <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data['rate']}% ({loan_data['interest_type']})</td>
@@ -200,7 +251,7 @@ def send_loan_notification_email(recipient_email, loan_data):
                                     <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data['months']} months</td>
                                 </tr>
                                 <tr style="border-top: 2px solid #e2e8f0;">
-                                    <td style="padding: 10px; color: #64748b;">Monthly Payment:</td>
+                                    <td style="padding: 10px; color: #64748b;">{"Monthly Fee" if loan_data.get('asset_type') == 'item' else "Monthly Payment"}:</td>
                                     <td style="padding: 10px; font-weight: bold; text-align: right; color: #10b981;">${loan_data['monthly']:,.2f}</td>
                                 </tr>
                                 <tr>
@@ -233,7 +284,10 @@ def send_loan_notification_email(recipient_email, loan_data):
         </html>
         """
         
-        text = f"LoanLink - New Loan Request\n\n{action}\n\nAmount: ${loan_data['amount']:,.2f}\nInterest: {loan_data['rate']}%"
+        if loan_data.get('asset_type') == 'item':
+            text = f"LoanLink - New Loan Request\n\n{action}\n\nItem: {loan_data['item_name']}\nTerm: {loan_data['months']} months"
+        else:
+            text = f"LoanLink - New Loan Request\n\n{action}\n\nAmount: ${loan_data['amount']:,.2f}\nInterest: {loan_data['rate']}%"
 
         # Use Resend if API Key is available
         if RESEND_API_KEY:
@@ -589,6 +643,12 @@ def create_loan():
     monthly = data.get('monthly')
     total = data.get('total')
     
+    # New fields
+    asset_type = data.get('assetType', 'currency')
+    item_name = data.get('itemName')
+    item_description = data.get('itemDescription')
+    item_condition = data.get('itemCondition')
+    
     # Determine who is who
     if role == 'lender':
         lender_email = user['email']
@@ -607,14 +667,18 @@ def create_loan():
     conn = get_db_connection()
     c = conn.cursor()
     c.execute('''
-        INSERT INTO loans (lender_email, borrower_email, creator_email, counterparty_name, amount, rate, months, interest_type, monthly_payment, total_repayment, created_at, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-    ''', (lender_email, borrower_email, creator_email, counterparty_name, amount, rate, months, type, monthly, total, created_at))
+        INSERT INTO loans (lender_email, borrower_email, creator_email, counterparty_name, asset_type, item_name, item_description, item_condition, amount, rate, months, interest_type, monthly_payment, total_repayment, created_at, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+    ''', (lender_email, borrower_email, creator_email, counterparty_name, asset_type, item_name, item_description, item_condition, amount, rate, months, type, monthly, total, created_at))
     conn.commit()
     conn.close()
     
     # Send email notification to counterparty
     email_data = {
+        'asset_type': asset_type,
+        'item_name': item_name,
+        'item_description': item_description,
+        'item_condition': item_condition,
         'amount': amount,
         'rate': rate,
         'months': months,
@@ -658,8 +722,13 @@ def make_payment(loan_id):
     else:
         c.execute('UPDATE loans SET paid_amount = ? WHERE id = ?', (new_paid, loan_id))
         
-    c.execute('INSERT INTO payments (loan_id, amount, date) VALUES (?, ?, ?)', 
-              (loan_id, amount, datetime.now().isoformat()))
+    method = data.get('method', 'Unknown')
+    date_str = data.get('date')
+    
+    payment_date = date_str if date_str else datetime.now().isoformat()
+        
+    c.execute('INSERT INTO payments (loan_id, amount, date, method) VALUES (?, ?, ?, ?)', 
+              (loan_id, amount, payment_date, method))
     conn.commit()
     conn.close()
     
@@ -698,15 +767,20 @@ def update_loan(loan_id):
     monthly = data.get('monthly')
     total = data.get('total')
     counterparty_name = data.get('counterpartyName')
+    asset_type = data.get('assetType', 'currency')
+    item_name = data.get('itemName')
+    item_description = data.get('itemDescription')
+    item_condition = data.get('itemCondition')
     
     # Update the loan
     c = conn.cursor()
     c.execute('''
         UPDATE loans 
         SET amount = ?, rate = ?, months = ?, interest_type = ?, 
-            monthly_payment = ?, total_repayment = ?, counterparty_name = ?
+            monthly_payment = ?, total_repayment = ?, counterparty_name = ?,
+            asset_type = ?, item_name = ?, item_description = ?, item_condition = ?
         WHERE id = ?
-    ''', (amount, rate, months, interest_type, monthly, total, counterparty_name, loan_id))
+    ''', (amount, rate, months, interest_type, monthly, total, counterparty_name, asset_type, item_name, item_description, item_condition, loan_id))
     conn.commit()
     
     # Get other party's email
@@ -715,6 +789,10 @@ def update_loan(loan_id):
     
     # Send updated email notification
     email_data = {
+        'asset_type': asset_type,
+        'item_name': item_name,
+        'item_description': item_description,
+        'item_condition': item_condition,
         'amount': amount,
         'rate': rate,
         'months': months,
@@ -812,6 +890,77 @@ def delete_loan(loan_id):
     c = conn.cursor()
     c.execute('DELETE FROM loans WHERE id = ?', (loan_id,))
     c.execute('DELETE FROM payments WHERE loan_id = ?', (loan_id,))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True})
+
+
+# --- Marketplace Listings Routes ---
+
+@app.route('/api/listings', methods=['GET'])
+def get_listings():
+    conn = get_db_connection()
+    listings_cursor = conn.execute('''
+        SELECT l.*, u.name as owner_name, u.alias as owner_alias 
+        FROM listings l
+        JOIN users u ON l.user_email = u.email
+        WHERE l.status = 'active'
+        ORDER BY l.created_at DESC
+    ''')
+    listings = [dict(row) for row in listings_cursor]
+    conn.close()
+    return jsonify(listings)
+
+@app.route('/api/listings', methods=['POST'])
+def create_listing():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    item_name = data.get('itemName')
+    description = data.get('description')
+    charge = data.get('charge')
+    deposit = data.get('deposit')
+    location = data.get('location')
+    tenure = data.get('tenure')
+    
+    if not item_name:
+        return jsonify({'error': 'Item name is required'}), 400
+        
+    created_at = datetime.now().isoformat()
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('''
+        INSERT INTO listings (user_email, item_name, description, charge, deposit, location, tenure, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (user['email'], item_name, description, charge, deposit, location, tenure, created_at))
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True})
+
+@app.route('/api/listings/<int:listing_id>', methods=['DELETE'])
+def delete_listing(listing_id):
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    conn = get_db_connection()
+    listing = conn.execute('SELECT * FROM listings WHERE id = ?', (listing_id,)).fetchone()
+    
+    if not listing:
+        conn.close()
+        return jsonify({'error': 'Listing not found'}), 404
+        
+    if listing['user_email'] != user['email']:
+        conn.close()
+        return jsonify({'error': 'You can only delete your own listings'}), 403
+        
+    c = conn.cursor()
+    c.execute('DELETE FROM listings WHERE id = ?', (listing_id,))
     conn.commit()
     conn.close()
     

@@ -99,6 +99,10 @@
                             <ion-icon name="add-circle-outline"></ion-icon>
                             <span>New Agreement</span>
                         </a>
+                        <a class="nav-item" id="nav-marketplace">
+                            <ion-icon name="shop-outline"></ion-icon>
+                            <span>Marketplace</span>
+                        </a>
                         <a class="nav-item" id="nav-archive">
                             <ion-icon name="archive-outline"></ion-icon>
                             <span>Archive</span>
@@ -191,6 +195,24 @@
         </div>
     </template>
 
+    <!-- Marketplace View -->
+    <template id="view-marketplace">
+        <div class="page-header"
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <div>
+                <h2 class="page-title">Marketplace</h2>
+                <p class="page-subtitle">Find items to borrow or lend your own.</p>
+            </div>
+            <button class="btn btn-primary" id="btn-open-listing">+ Post Listing</button>
+        </div>
+
+        <div id="listings-container" class="dashboard-grid"
+            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px;">
+            <!-- Items filled dynamically -->
+        </div>
+    </template>
+
+
     <!-- 4. Create View -->
     <template id="view-create">
         <div class="page-header">
@@ -201,30 +223,67 @@
         <div class="glass-panel" style="max-width: 700px;">
             <form id="create-loan-form">
                 <div class="form-group" style="margin-bottom: 24px;">
-                    <label style="display: block; margin-bottom: 12px; color: var(--text-secondary);">Your Role</label>
-                    <div style="display: flex; gap: 10px;">
-                        <label class="btn btn-secondary" style="flex: 1; text-align: center;">
+                    <label style="display: block; margin-bottom: 12px; color: var(--text-secondary);">Your Role & Loan
+                        Type</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <label class="btn btn-secondary" style="text-align: center; font-size: 0.9em; padding: 10px;">
                             <input type="radio" name="role" value="borrower" checked style="display:none;">
                             I am Borrowing
                         </label>
-                        <label class="btn btn-secondary" style="flex: 1; text-align: center;">
+                        <label class="btn btn-secondary" style="text-align: center; font-size: 0.9em; padding: 10px;">
                             <input type="radio" name="role" value="lender" style="display:none;">
                             I am Lending
                         </label>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <label class="btn btn-secondary" style="text-align: center; font-size: 0.9em; padding: 10px;"
+                            id="type-currency-label">
+                            <input type="radio" name="assetType" value="currency" checked style="display:none;">
+                            Money
+                        </label>
+                        <label class="btn btn-secondary" style="text-align: center; font-size: 0.9em; padding: 10px;"
+                            id="type-item-label">
+                            <input type="radio" name="assetType" value="item" style="display:none;">
+                            Physical Item
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Item Specific Fields (Hidden by default) -->
+                <div id="item-fields" class="hidden" style="margin-bottom: 24px;">
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Item
+                            Name</label>
+                        <input type="text" id="item-name" class="form-input" placeholder="e.g. PS5, Tesla Model 3">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label
+                                style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Condition</label>
+                            <input type="text" id="item-condition" class="form-input"
+                                placeholder="e.g. New, Used - Excellent">
+                        </div>
+                        <div class="form-group">
+                            <label
+                                style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Description</label>
+                            <input type="text" id="item-description" class="form-input"
+                                placeholder="e.g. Serial #12345, include cables">
+                        </div>
                     </div>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div class="form-group">
-                        <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Counterparty
+                        <label id="counterparty-label"
+                            style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Counterparty
                             Email</label>
                         <input type="email" id="counterparty-email" class="form-input" placeholder="friend@example.com"
                             required>
                     </div>
                     <div class="form-group">
-                        <label style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Amount
-                            ($)</label>
-                        <input type="number" id="amount" class="form-input" placeholder="1000" min="1" step="0.01"
+                        <label id="amount-label"
+                            style="color: var(--text-secondary); display: block; margin-bottom: 8px;">Amount ($)</label>
+                        <input type="number" id="amount" class="form-input" placeholder="1000" min="0" step="0.01"
                             required>
                     </div>
                 </div>
@@ -248,14 +307,14 @@
                     </div>
                 </div>
 
-                <div
+                <div id="payment-preview"
                     style="background: rgba(99, 102, 241, 0.1); padding: 20px; border-radius: var(--radius-md); margin: 20px 0;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                        <span>Monthly Payment:</span>
+                        <span id="preview-monthly-label">Monthly Payment:</span>
                         <span id="preview-monthly" style="font-weight: 700; color: var(--success);">$0.00</span>
                     </div>
                     <div style="display: flex; justify-content: space-between;">
-                        <span>Total Repayment:</span>
+                        <span id="preview-total-label">Total Repayment:</span>
                         <span id="preview-total" style="font-weight: 700; color: var(--success);">$0.00</span>
                     </div>
                 </div>
@@ -369,8 +428,31 @@
         style="position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 100;">
         <div class="glass-panel" style="width: 90%; max-width: 400px; background: #1e293b;">
             <h3 style="margin-bottom: 20px;">Record Payment</h3>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label
+                    style="color: var(--text-secondary); display: block; margin-bottom: 8px; font-size: 0.9em;">Amount
+                    ($)</label>
+                <input type="number" id="payment-amount" class="form-input" placeholder="0.00" step="0.01">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label
+                    style="color: var(--text-secondary); display: block; margin-bottom: 8px; font-size: 0.9em;">Payment
+                    Method</label>
+                <select id="payment-method" class="form-input">
+                    <option value="Cash">Cash</option>
+                    <option value="Direct Transfer">Direct Transfer</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="Other">Other...</option>
+                </select>
+                <input type="text" id="payment-method-other" class="form-input hidden" placeholder="Specify method"
+                    style="margin-top: 8px;">
+            </div>
+
             <div class="form-group">
-                <input type="number" id="payment-amount" class="form-input" placeholder="Amount ($)" step="0.01">
+                <label
+                    style="color: var(--text-secondary); display: block; margin-bottom: 8px; font-size: 0.9em;">Date</label>
+                <input type="date" id="payment-date" class="form-input">
             </div>
             <div style="display: flex; gap: 12px; justify-content: flex-end;">
                 <button id="cancel-payment" class="btn btn-secondary">Cancel</button>
@@ -415,6 +497,49 @@
             <div id="details-history-list" style="display: flex; flex-direction: column; gap: 8px;">
                 <!-- Items -->
             </div>
+        </div>
+    </div>
+
+    <!-- Listing Modal -->
+    <div id="listing-modal" class="modal hidden"
+        style="position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 100;">
+        <div class="glass-panel" style="width: 95%; max-width: 500px; background: #1e293b;">
+            <h3 style="margin-bottom: 20px;">Post New Listing</h3>
+            <form id="listing-form">
+                <div class="form-group">
+                    <label style="color: var(--text-secondary);">Item Name</label>
+                    <input type="text" id="listing-name" class="form-input" placeholder="e.g. PS5, Tesla" required>
+                </div>
+                <div class="form-group">
+                    <label style="color: var(--text-secondary);">Description</label>
+                    <textarea id="listing-desc" class="form-input" style="height: 80px;"
+                        placeholder="Details about the item..."></textarea>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label style="color: var(--text-secondary);">Rental Fee ($)</label>
+                        <input type="number" id="listing-charge" class="form-input" placeholder="50" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: var(--text-secondary);">Deposit ($)</label>
+                        <input type="number" id="listing-deposit" class="form-input" placeholder="100" step="0.01">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label style="color: var(--text-secondary);">Location</label>
+                        <input type="text" id="listing-location" class="form-input" placeholder="City, Area">
+                    </div>
+                    <div class="form-group">
+                        <label style="color: var(--text-secondary);">Term (Months)</label>
+                        <input type="number" id="listing-tenure" class="form-input" placeholder="1">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 10px;">
+                    <button type="button" id="cancel-listing" class="btn btn-secondary">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Post Now</button>
+                </div>
+            </form>
         </div>
     </div>
 

@@ -5,7 +5,8 @@ const API_URL = '/api';
 // State
 const state = {
     loans: [],
-    view: 'auth', // 'auth', 'dashboard', 'create', 'reset'
+    listings: [],
+    view: 'auth', // 'auth', 'dashboard', 'create', 'reset', 'marketplace'
     user: JSON.parse(localStorage.getItem('loanLink_user')) || null,
     token: localStorage.getItem('loanLink_token') || null,
     authMode: 'login' // 'login', 'signup', or 'forgot'
@@ -134,13 +135,13 @@ const rejectLoan = async (id) => {
     }
 };
 
-const recordPayment = async (loanId, amount) => {
+const recordPayment = async (loanId, amount, method, date) => {
     try {
-        await apiRequest(`/loans/${loanId}/pay`, 'POST', { amount });
+        await apiRequest(`/loans/${loanId}/pay`, 'POST', { amount, method, date });
         document.getElementById('payment-modal').classList.add('hidden');
         document.getElementById('payment-amount').value = '';
         fetchLoans();
-        alert('Payment recorded!'); // Simple feedback
+        alert('Payment recorded!');
     } catch (e) {
         alert("Failed to pay: " + e.message);
     }
@@ -207,6 +208,48 @@ window.editLoan = (id) => {
     navigate('create');
 };
 
+// Marketplace Actions
+const fetchListings = async () => {
+    try {
+        const listings = await apiRequest('/listings');
+        state.listings = listings;
+        if (state.view === 'marketplace') renderMarketplace();
+    } catch (e) {
+        console.error("Failed to fetch listings", e);
+    }
+};
+
+const createListingPost = async (listingData) => {
+    try {
+        await apiRequest('/listings', 'POST', listingData);
+        document.getElementById('listing-modal').classList.add('hidden');
+        document.getElementById('listing-form').reset();
+        fetchListings();
+        alert('Listing posted successfully!');
+    } catch (e) {
+        alert("Failed to post listing: " + e.message);
+    }
+};
+
+const deleteListingPost = async (id) => {
+    if (!confirm("Delete this listing?")) return;
+    try {
+        await apiRequest(`/listings/${id}`, 'DELETE');
+        fetchListings();
+    } catch (e) {
+        alert("Failed to delete listing: " + e.message);
+    }
+};
+
+window.requestFromListing = (listingId) => {
+    const listing = state.listings.find(l => l.id === listingId);
+    if (!listing) return;
+
+    // Pre-fill "New Agreement" with listing data
+    state.preFillListing = listing;
+    navigate('create');
+};
+
 // Navigation & Routing
 const appRoot = document.getElementById('app-root');
 
@@ -265,6 +308,7 @@ const render = () => {
         // Active Nav State
         const navDash = layout.getElementById('nav-dashboard');
         const navCreate = layout.getElementById('nav-create');
+        const navMarketplace = layout.getElementById('nav-marketplace');
         const navProfile = layout.getElementById('nav-profile');
         const navArchive = layout.getElementById('nav-archive');
 
@@ -273,6 +317,9 @@ const render = () => {
 
         if (state.view === 'create') navCreate.classList.add('active');
         else navCreate.classList.remove('active');
+
+        if (state.view === 'marketplace') navMarketplace.classList.add('active');
+        else navMarketplace.classList.remove('active');
 
         if (state.view === 'profile') navProfile.classList.add('active');
         else navProfile.classList.remove('active');
@@ -289,6 +336,9 @@ const render = () => {
         } else if (state.view === 'create') {
             const createTemplate = document.getElementById('view-create');
             mainContent.appendChild(createTemplate.content.cloneNode(true));
+        } else if (state.view === 'marketplace') {
+            const marketplaceTemplate = document.getElementById('view-marketplace');
+            mainContent.appendChild(marketplaceTemplate.content.cloneNode(true));
         } else if (state.view === 'profile') {
             const profileTemplate = document.getElementById('view-profile');
             mainContent.appendChild(profileTemplate.content.cloneNode(true));
@@ -302,6 +352,7 @@ const render = () => {
         // listeners
         document.getElementById('nav-dashboard').addEventListener('click', () => navigate('dashboard'));
         document.getElementById('nav-create').addEventListener('click', () => navigate('create'));
+        document.getElementById('nav-marketplace').addEventListener('click', () => navigate('marketplace'));
         document.getElementById('nav-profile').addEventListener('click', () => navigate('profile'));
         document.getElementById('nav-archive').addEventListener('click', () => navigate('archive'));
         document.getElementById('nav-logout').addEventListener('click', logout);
@@ -310,6 +361,9 @@ const render = () => {
             renderDashboard();
         } else if (state.view === 'create') {
             initCreateListeners();
+        } else if (state.view === 'marketplace') {
+            renderMarketplace();
+            initMarketplaceListeners();
         } else if (state.view === 'profile') {
             initProfileListeners();
         } else if (state.view === 'archive') {
@@ -317,6 +371,113 @@ const render = () => {
         }
     }
 };
+
+
+const renderMarketplace = async () => {
+    const container = document.getElementById('listings-container');
+    if (!container) return;
+
+    container.innerHTML = '<div class="glass-panel text-center" style="grid-column: 1/-1; padding: 40px; opacity: 0.6;"><p>Loading listings...</p></div>';
+
+    await fetchListings();
+
+    container.innerHTML = '';
+
+    if (state.listings.length === 0) {
+        container.innerHTML = '<div class="glass-panel text-center" style="grid-column: 1/-1; padding: 40px; opacity: 0.6;"><p>No items listed yet. Be the first to post!</p></div>';
+        return;
+    }
+
+    state.listings.forEach(listing => {
+        const isOwner = listing.user_email === state.user.email;
+        const div = document.createElement('div');
+        div.className = 'glass-panel listing-card';
+        div.style.padding = '24px';
+        div.style.display = 'flex';
+        div.style.flexDirection = 'column';
+        div.style.gap = '15px';
+
+        div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div class="brand-icon" style="width: 40px; height: 40px; font-size: 1rem;">${listing.item_name.substring(0, 2).toUpperCase()}</div>
+                ${isOwner ? '<span class="loan-status" style="background: var(--glass-border); color: var(--text-secondary);">Your Post</span>' : ''}
+            </div>
+            
+            <div>
+                <h3 style="margin: 0; font-size: 1.2rem;">${listing.item_name}</h3>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 5px;">${listing.description || 'No description provided.'}</p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.85rem;">
+                <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
+                    <div style="color: var(--text-secondary);">Charge</div>
+                    <div style="font-weight: 700; color: var(--success); font-size: 1.1rem;">${formatMoney(listing.charge || 0)}</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px;">
+                    <div style="color: var(--text-secondary);">Deposit</div>
+                    <div style="font-weight: 700; font-size: 1.1rem;">${formatMoney(listing.deposit || 0)}</div>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 0.85rem; color: var(--text-secondary);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <ion-icon name="location-outline"></ion-icon>
+                    <span>${listing.location || 'N/A'}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <ion-icon name="time-outline"></ion-icon>
+                    <span>${listing.tenure || 'Flexible'} Month(s) Tenure</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <ion-icon name="person-outline"></ion-icon>
+                    <span>Posted by: ${listing.owner_alias || listing.owner_name || listing.user_email}</span>
+                </div>
+            </div>
+
+            <div style="margin-top: auto; padding-top: 15px;">
+                ${isOwner ? `
+                    <button class="btn btn-danger" style="width: 100%;" onclick="deleteListingPost(${listing.id})">Remove Listing</button>
+                ` : `
+                    <button class="btn btn-primary" style="width: 100%; font-weight: 700;" onclick="requestFromListing(${listing.id})">Request to Borrow</button>
+                `}
+            </div>
+        `;
+        container.appendChild(div);
+    });
+};
+
+const initMarketplaceListeners = () => {
+    const modal = document.getElementById('listing-modal');
+    const openBtn = document.getElementById('btn-open-listing');
+    const cancelBtn = document.getElementById('cancel-listing');
+    const form = document.getElementById('listing-form');
+
+    window.openListingModal = () => modal.classList.remove('hidden');
+
+    if (openBtn) openBtn.onclick = openListingModal;
+    if (cancelBtn) {
+        cancelBtn.onclick = () => {
+            modal.classList.add('hidden');
+            form.reset();
+        };
+    }
+
+    if (form) {
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            const listingData = {
+                itemName: document.getElementById('listing-name').value,
+                description: document.getElementById('listing-desc').value,
+                charge: parseFloat(document.getElementById('listing-charge').value) || 0,
+                deposit: parseFloat(document.getElementById('listing-deposit').value) || 0,
+                location: document.getElementById('listing-location').value,
+                tenure: parseInt(document.getElementById('listing-tenure').value) || 0
+            };
+            createListingPost(listingData);
+        };
+    }
+};
+
 
 const initProfileListeners = async () => {
     // Load data
@@ -379,11 +540,14 @@ const renderDashboard = () => {
 
     state.loans.forEach(loan => {
         const displayTitle = getLoanTitle(loan);
+        const isItem = loan.asset_type === 'item';
 
         // Status checks
         if (loan.status === 'pending') {
             const isCreator = loan.creator_email === state.user.email;
             const isMyRole = loan.role === 'lender' ? 'Lending' : 'Borrowing';
+
+            let displayAmount = isItem ? loan.item_name : formatMoney(loan.amount);
 
             let actionHtml = '';
             if (isCreator) {
@@ -400,9 +564,9 @@ const renderDashboard = () => {
             const div = document.createElement('div');
             div.className = 'loan-item';
             div.innerHTML = `
-                <div class="loan-icon"><ion-icon name="time-outline"></ion-icon></div>
+                <div class="loan-icon"><ion-icon name="${isItem ? 'cube-outline' : 'time-outline'}"></ion-icon></div>
                 <div class="loan-details">
-                    <div class="loan-title">${formatMoney(loan.amount)}</div>
+                    <div class="loan-title">${displayAmount}</div>
                     <div class="loan-subtitle">${isMyRole} to/from ${displayTitle}</div>
                 </div>
                 <div>${actionHtml}</div>
@@ -421,24 +585,27 @@ const renderDashboard = () => {
             div.style.cursor = 'pointer';
             div.setAttribute('onclick', `openLoanDetails(${loan.id})`);
 
+            let iconName = isItem ? 'cube-outline' : (loan.role === 'borrower' ? 'arrow-down-outline' : 'arrow-up-outline');
+            let displayHeader = isItem ? `${loan.item_name} (${displayTitle})` : displayTitle;
+
             div.innerHTML = `
                 <div class="loan-icon">
-                    <ion-icon name="${loan.role === 'borrower' ? 'arrow-down-outline' : 'arrow-up-outline'}"></ion-icon>
+                    <ion-icon name="${iconName}"></ion-icon>
                 </div>
                 <div class="loan-details">
-                    <div class="loan-title">${displayTitle}</div>
+                    <div class="loan-title">${displayHeader}</div>
                     <div class="loan-subtitle">
                         <span class="loan-status status-active">Active</span>
                         ${loan.months}mo Term
                     </div>
                    <div style="margin-top: 8px;">
                         <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8em;" onclick="event.stopPropagation(); openPayment(${loan.id})">
-                             ${loan.role === 'borrower' ? 'Pay' : 'Record'}
+                             ${loan.role === 'borrower' ? (isItem ? 'Pay Fee' : 'Pay') : (isItem ? 'Record Fee' : 'Record')}
                         </button>
                    </div>
                 </div>
                 <div class="loan-values">
-                    <span class="loan-amount">${formatMoney(remaining)}</span>
+                    <span class="loan-amount">${isItem ? 'Fee: ' : ''}${formatMoney(remaining)}</span>
                     <span style="font-size:0.8em; color:var(--text-secondary);">of ${formatMoney(loan.total)}</span>
                 </div>
             `;
@@ -480,17 +647,20 @@ const renderArchive = () => {
 
     completedLoans.forEach(loan => {
         const displayTitle = getLoanTitle(loan);
+        const isItem = loan.asset_type === 'item';
         const div = document.createElement('div');
         div.className = 'loan-item';
         div.style.opacity = '0.6';
         div.style.cursor = 'pointer';
         div.setAttribute('onclick', `openLoanDetails(${loan.id})`);
 
+        let displaySub = isItem ? `Item Returned • ${loan.item_name}` : `Loan Repaid • ${formatMoney(loan.total)}`;
+
         div.innerHTML = `
-            <div class="loan-icon"><ion-icon name="checkmark-done-circle-outline" style="color: var(--success);"></ion-icon></div>
+            <div class="loan-icon"><ion-icon name="${isItem ? 'cube-outline' : 'checkmark-done-circle-outline'}" style="color: var(--success);"></ion-icon></div>
             <div class="loan-details">
                 <div class="loan-title">${displayTitle}</div>
-                <div class="loan-subtitle">Loan Repaid • ${formatMoney(loan.total)}</div>
+                <div class="loan-subtitle">${displaySub}</div>
             </div>
             <div class="loan-values">
                 <span class="loan-status" style="background: rgba(16, 185, 129, 0.2); color: var(--success);">Completed</span>
@@ -635,10 +805,34 @@ const initCreateListeners = () => {
         if (el) el.addEventListener('input', updatePreview);
     });
 
-    // Check radio buttons helper
-    const radios = form.querySelectorAll('input[name="role"]');
-    const updateRadios = () => {
-        radios.forEach(r => {
+    // Asset Type Radios
+    const assetRadios = form.querySelectorAll('input[name="assetType"]');
+    const itemFields = document.getElementById('item-fields');
+    const amountLabel = document.getElementById('amount-label');
+    const previewMonthlyLabel = document.getElementById('preview-monthly-label');
+    const previewTotalLabel = document.getElementById('preview-total-label');
+
+    const updateAssetType = () => {
+        const val = form.querySelector('input[name="assetType"]:checked').value;
+        if (val === 'item') {
+            itemFields.classList.remove('hidden');
+            amountLabel.textContent = "Rental Fee / Deposit ($)";
+            previewMonthlyLabel.textContent = "Monthly Fee:";
+            previewTotalLabel.textContent = "Total Fees:";
+            document.getElementById('item-name').required = true;
+        } else {
+            itemFields.classList.add('hidden');
+            amountLabel.textContent = "Amount ($)";
+            previewMonthlyLabel.textContent = "Monthly Payment:";
+            previewTotalLabel.textContent = "Total Repayment:";
+            document.getElementById('item-name').required = false;
+        }
+        updateAssetRadios();
+        updatePreview();
+    };
+
+    const updateAssetRadios = () => {
+        assetRadios.forEach(r => {
             const parent = r.closest('label');
             if (r.checked) {
                 parent.classList.remove('btn-secondary');
@@ -649,21 +843,112 @@ const initCreateListeners = () => {
             }
         });
     };
+
+    assetRadios.forEach(radio => {
+        radio.addEventListener('change', updateAssetType);
+    });
+
+    // Check Role radio buttons helper
+    const radios = form.querySelectorAll('input[name="role"]');
+    const updateRadios = () => {
+        radios.forEach(r => {
+            const parent = r.closest('label');
+            if (r.checked) {
+                parent.classList.remove('btn-secondary');
+                parent.classList.add('btn-primary');
+
+                // Update Label Text based on checked role
+                const label = document.getElementById('counterparty-label');
+                if (label) {
+                    if (r.value === 'borrower') {
+                        label.textContent = "Lender's Email";
+                    } else {
+                        label.textContent = "Borrower's Email";
+                    }
+                }
+            } else {
+                parent.classList.add('btn-secondary');
+                parent.classList.remove('btn-primary');
+            }
+        });
+    };
     radios.forEach(radio => {
         radio.addEventListener('change', updateRadios);
     });
+
     // Init state
     updateRadios();
+    updateAssetRadios();
 
     // Cancel Button
     document.getElementById('create-cancel').addEventListener('click', () => {
         navigate('dashboard');
     });
 
-    form.addEventListener('submit', (e) => {
+    // Pre-fill if editing
+    if (state.editingLoanId) {
+        const loan = state.loans.find(l => l.id === state.editingLoanId);
+        if (loan) {
+            // Set Role
+            form.querySelector(`input[name="role"][value="${loan.role}"]`).checked = true;
+            updateRadios();
+
+            // Set Asset Type
+            form.querySelector(`input[name="assetType"][value="${loan.asset_type}"]`).checked = true;
+            updateAssetType();
+
+            // Set fields
+            document.getElementById('counterparty-email').value = loan.counterparty;
+            document.getElementById('counterparty').value = loan.counterparty_name || '';
+            document.getElementById('amount').value = loan.amount;
+            document.getElementById('interest').value = loan.rate;
+            document.getElementById('tenure').value = loan.months;
+            document.getElementById('interest-type').value = loan.interestType;
+
+            if (loan.asset_type === 'item') {
+                document.getElementById('item-name').value = loan.item_name || '';
+                document.getElementById('item-description').value = loan.item_description || '';
+                document.getElementById('item-condition').value = loan.item_condition || '';
+            }
+
+            // Update header
+            const header = document.querySelector('.page-title');
+            if (header) header.textContent = "Edit Agreement";
+
+            updatePreview();
+        }
+    }
+
+    // Pre-fill if from Marketplace
+    if (state.preFillListing) {
+        const listing = state.preFillListing;
+        // Marketplace requests are always "I am Borrowing"
+        form.querySelector('input[name="role"][value="borrower"]').checked = true;
+        updateRadios();
+
+        // Marketplace items are always "Physical Item"
+        form.querySelector('input[name="assetType"][value="item"]').checked = true;
+        updateAssetType();
+
+        // Fill fields
+        document.getElementById('counterparty-email').value = listing.user_email;
+        document.getElementById('counterparty').value = listing.owner_name || '';
+        document.getElementById('item-name').value = listing.item_name;
+        document.getElementById('item-description').value = listing.description || '';
+        document.getElementById('amount').value = (listing.charge || 0) + (listing.deposit || 0);
+        document.getElementById('tenure').value = listing.tenure || 1;
+
+        // Reset so it doesn't persist
+        state.preFillListing = null;
+        updatePreview();
+    }
+
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const role = form.querySelector('input[name="role"]:checked').value;
+        const assetType = form.querySelector('input[name="assetType"]:checked').value;
         const amount = parseFloat(document.getElementById('amount').value);
+
         // Recalc for safety
         updatePreview();
         const monthly = parseFloat(document.getElementById('preview-monthly').textContent.replace(/[^0-9.-]+/g, ""));
@@ -671,6 +956,10 @@ const initCreateListeners = () => {
 
         const loanData = {
             role,
+            assetType,
+            itemName: document.getElementById('item-name').value,
+            itemDescription: document.getElementById('item-description').value,
+            itemCondition: document.getElementById('item-condition').value,
             counterpartyEmail: document.getElementById('counterparty-email').value,
             counterpartyName: document.getElementById('counterparty').value,
             amount,
@@ -680,7 +969,20 @@ const initCreateListeners = () => {
             monthly,
             total
         };
-        createLoan(loanData);
+
+        try {
+            if (state.editingLoanId) {
+                await apiRequest(`/loans/${state.editingLoanId}`, 'PUT', loanData);
+                alert('Loan agreement updated!');
+                state.editingLoanId = null;
+                navigate('dashboard');
+                fetchLoans();
+            } else {
+                await createLoan(loanData);
+            }
+        } catch (err) {
+            alert(err.message);
+        }
     });
 };
 
@@ -697,6 +999,7 @@ window.openReview = (id) => {
     // We need to define who is who for the review text.
     // "User X is proposing to [Lend/Borrow] $Y to/from You."
     const isMeLender = loan.role === 'lender';
+    const isItem = loan.asset_type === 'item';
 
     content.innerHTML = `
         <p style="font-size: 1.2rem; margin-bottom: 12px;">
@@ -704,8 +1007,24 @@ window.openReview = (id) => {
             ${isMeLender ? 'BORROW from you' : 'LEND to you'}:
         </p>
         <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+            ${isItem ? `
+            <div style="display:flex; justify-content:space-between; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                <span>Item:</span>
+                <strong>${loan.item_name}</strong>
+            </div>
+            ${loan.item_description ? `
             <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
-                <span>Principal Amount:</span>
+                <span>Description:</span>
+                <span style="font-size: 0.9em; text-align: right; max-width: 60%;">${loan.item_description}</span>
+            </div>` : ''}
+            ${loan.item_condition ? `
+            <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
+                <span>Condition:</span>
+                <strong>${loan.item_condition}</strong>
+            </div>` : ''}
+            ` : ''}
+            <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+                <span>${isItem ? 'Rental/Deposit:' : 'Principal Amount:'}</span>
                 <strong>${formatMoney(loan.amount)}</strong>
             </div>
              <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
@@ -713,7 +1032,7 @@ window.openReview = (id) => {
                 <strong>${loan.rate}% (${loan.interestType})</strong>
             </div>
              <div style="display:flex; justify-content:space-between; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px; margin-top: 4px;">
-                <span>Total Repayment:</span>
+                <span>Total ${isItem ? 'Fees' : 'Repayment'}:</span>
                 <strong style="color: var(--accent);">${formatMoney(loan.total)}</strong>
             </div>
         </div>
@@ -729,6 +1048,17 @@ window.openReview = (id) => {
 let currentPaymentLoanId = null;
 window.openPayment = (id) => {
     currentPaymentLoanId = id;
+
+    // Reset fields
+    document.getElementById('payment-amount').value = '';
+    document.getElementById('payment-method').value = 'Cash';
+    document.getElementById('payment-method-other').classList.add('hidden');
+    document.getElementById('payment-method-other').value = '';
+
+    // Set Date to Today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('payment-date').value = today;
+
     document.getElementById('payment-modal').classList.remove('hidden');
 };
 
@@ -749,10 +1079,40 @@ window.openLoanDetails = (id) => {
         displayTitle = loan.counterparty_name;
     }
 
-    document.getElementById('details-title').textContent = `${loan.role === 'lender' ? 'Lending to' : 'Borrowing from'} ${displayTitle}`;
+    const isItem = loan.asset_type === 'item';
+    let detailsText = `${loan.role === 'lender' ? 'Lending to' : 'Borrowing from'} ${displayTitle}`;
+    if (isItem) detailsText = `${loan.item_name} - ${detailsText}`;
+
+    document.getElementById('details-title').textContent = detailsText;
     document.getElementById('details-total').textContent = formatMoney(loan.total);
     document.getElementById('details-paid').textContent = formatMoney(loan.paid);
     document.getElementById('details-remaining').textContent = formatMoney(loan.total - loan.paid);
+
+    // If item, add item details to the modal?
+    if (isItem) {
+        const historyHeader = document.querySelector('#details-history-list').previousElementSibling;
+        const itemInfoDivId = 'details-item-info';
+        let itemInfoDiv = document.getElementById(itemInfoDivId);
+        if (!itemInfoDiv) {
+            itemInfoDiv = document.createElement('div');
+            itemInfoDiv.id = itemInfoDivId;
+            itemInfoDiv.style.marginBottom = '20px';
+            itemInfoDiv.style.padding = '15px';
+            itemInfoDiv.style.background = 'rgba(255,255,255,0.05)';
+            itemInfoDiv.style.borderRadius = '12px';
+            historyHeader.parentNode.insertBefore(itemInfoDiv, historyHeader);
+        }
+        itemInfoDiv.innerHTML = `
+            <h4 style="margin-top:0; margin-bottom:10px; color:var(--text-secondary);">Item Details</h4>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div><span style="color:var(--text-secondary); font-size:0.9em;">Condition:</span> <br><strong>${loan.item_condition || 'N/A'}</strong></div>
+                <div><span style="color:var(--text-secondary); font-size:0.9em;">Description:</span> <br><strong>${loan.item_description || 'N/A'}</strong></div>
+            </div>
+        `;
+    } else {
+        const itemInfoDiv = document.getElementById('details-item-info');
+        if (itemInfoDiv) itemInfoDiv.remove();
+    }
 
     // Fill History
     const historyList = document.getElementById('details-history-list');
@@ -767,7 +1127,8 @@ window.openLoanDetails = (id) => {
             div.style.display = 'flex';
             div.style.justifyContent = 'space-between';
             const date = new Date(payment.date).toLocaleDateString();
-            div.innerHTML = `<span>${date}</span><span style="color: var(--success);">+${formatMoney(payment.amount)}</span>`;
+            const method = payment.method ? ` <span style="font-size:0.8em; color:var(--text-secondary);">(${payment.method})</span>` : '';
+            div.innerHTML = `<span>${date}${method}</span><span style="color: var(--success);">+${formatMoney(payment.amount)}</span>`;
             historyList.appendChild(div);
         });
     } else {
@@ -919,8 +1280,28 @@ document.getElementById('cancel-payment').addEventListener('click', () => {
 
 document.getElementById('confirm-payment').addEventListener('click', () => {
     const amount = parseFloat(document.getElementById('payment-amount').value);
+
+    const methodSelect = document.getElementById('payment-method').value;
+    let method = methodSelect;
+    if (method === 'Other') {
+        method = document.getElementById('payment-method-other').value || 'Other';
+    }
+
+    const date = document.getElementById('payment-date').value;
+
     if (amount > 0 && currentPaymentLoanId) {
-        recordPayment(currentPaymentLoanId, amount);
+        recordPayment(currentPaymentLoanId, amount, method, date);
+    } else {
+        alert("Please enter a valid amount.");
+    }
+});
+
+document.getElementById('payment-method').addEventListener('change', (e) => {
+    const otherInput = document.getElementById('payment-method-other');
+    if (e.target.value === 'Other') {
+        otherInput.classList.remove('hidden');
+    } else {
+        otherInput.classList.add('hidden');
     }
 });
 
