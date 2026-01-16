@@ -735,9 +735,17 @@ def make_payment(loan_id):
     user = get_current_user()
     if not user:
         return jsonify({'error': 'Unauthorized'}), 401
-    
-    data = request.json
-    amount = data.get('amount')
+
+    # Safe extraction of amount
+    if request.is_json:
+        amount = request.json.get('amount')
+    else:
+        amount = request.form.get('amount')
+        
+    if amount:
+        amount = float(amount)
+        
+    conn = get_db_connection()
     
     conn = get_db_connection()
     loan = conn.execute('SELECT * FROM loans WHERE id = ?', (loan_id,)).fetchone()
