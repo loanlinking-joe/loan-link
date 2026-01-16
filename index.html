@@ -223,8 +223,7 @@
         <div class="glass-panel" style="max-width: 700px;">
             <form id="create-loan-form">
                 <div class="form-group" style="margin-bottom: 24px;">
-                    <label style="display: block; margin-bottom: 12px; color: var(--text-secondary);">Your Role & Loan
-                        Type</label>
+                    <label style="display: block; margin-bottom: 12px; color: var(--text-secondary);">Your Role</label>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
                         <label class="btn btn-secondary" style="text-align: center; font-size: 0.9em; padding: 10px;">
                             <input type="radio" name="role" value="borrower" checked style="display:none;">
@@ -235,15 +234,13 @@
                             I am Lending
                         </label>
                     </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <label class="btn btn-secondary" style="text-align: center; font-size: 0.9em; padding: 10px;"
-                            id="type-currency-label">
-                            <input type="radio" name="assetType" value="currency" checked style="display:none;">
+                    <div style="display: none;">
+                        <label class="btn btn-secondary" id="type-currency-label">
+                            <input type="radio" name="assetType" value="currency" checked>
                             Money
                         </label>
-                        <label class="btn btn-secondary" style="text-align: center; font-size: 0.9em; padding: 10px;"
-                            id="type-item-label">
-                            <input type="radio" name="assetType" value="item" style="display:none;">
+                        <label class="btn btn-secondary" id="type-item-label">
+                            <input type="radio" name="assetType" value="item">
                             Physical Item
                         </label>
                     </div>
