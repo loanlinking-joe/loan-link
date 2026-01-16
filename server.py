@@ -33,6 +33,11 @@ def handle_exception(e):
         "details": str(e)
     }), 500
 
+@app.route('/uploads/<path:filename>')
+def serve_upload(filename):
+    uploads_dir = os.path.join(BASE_DIR, 'uploads')
+    return send_from_directory(uploads_dir, filename)
+
 @app.route('/api/debug-users')
 def debug_users():
     conn = get_db_connection()
@@ -148,7 +153,13 @@ def init_db():
             try: c.execute(f"ALTER TABLE loans ADD COLUMN {col} TEXT")
             except: pass
             
+        try: c.execute("ALTER TABLE loans ADD COLUMN payment_frequency TEXT DEFAULT 'Monthly'")
+        except: pass
+            
         try: c.execute("ALTER TABLE payments ADD COLUMN method TEXT")
+        except: pass
+
+        try: c.execute("ALTER TABLE payments ADD COLUMN proof_image TEXT")
         except: pass
         
         # Ensure asset_type defaults to currency if null
@@ -257,6 +268,10 @@ def send_loan_notification_email(recipient_email, loan_data):
                                 <tr>
                                     <td style="padding: 10px; color: #64748b;">Total Repayment:</td>
                                     <td style="padding: 10px; font-weight: bold; text-align: right; color: #6366f1;">${loan_data['total']:,.2f}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 10px; color: #64748b;">Schedule:</td>
+                                    <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data.get('payment_frequency', 'Monthly')}</td>
                                 </tr>
                             </table>
                         </div>
@@ -648,6 +663,7 @@ def create_loan():
     item_name = data.get('itemName')
     item_description = data.get('itemDescription')
     item_condition = data.get('itemCondition')
+    payment_frequency = data.get('paymentFrequency', 'Monthly')
     
     # Determine who is who
     if role == 'lender':
@@ -667,9 +683,9 @@ def create_loan():
     conn = get_db_connection()
     c = conn.cursor()
     c.execute('''
-        INSERT INTO loans (lender_email, borrower_email, creator_email, counterparty_name, asset_type, item_name, item_description, item_condition, amount, rate, months, interest_type, monthly_payment, total_repayment, created_at, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-    ''', (lender_email, borrower_email, creator_email, counterparty_name, asset_type, item_name, item_description, item_condition, amount, rate, months, type, monthly, total, created_at))
+        INSERT INTO loans (lender_email, borrower_email, creator_email, counterparty_name, asset_type, item_name, item_description, item_condition, amount, rate, months, interest_type, monthly_payment, total_repayment, created_at, status, payment_frequency)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+    ''', (lender_email, borrower_email, creator_email, counterparty_name, asset_type, item_name, item_description, item_condition, amount, rate, months, type, monthly, total, created_at, payment_frequency))
     conn.commit()
     conn.close()
     
@@ -686,6 +702,7 @@ def create_loan():
         'monthly': monthly,
         'total': total,
         'role': role,
+        'payment_frequency': payment_frequency,
         'creator_name': user['name'] if user['name'] else user['email']
     }
     
@@ -722,13 +739,40 @@ def make_payment(loan_id):
     else:
         c.execute('UPDATE loans SET paid_amount = ? WHERE id = ?', (new_paid, loan_id))
         
-    method = data.get('method', 'Unknown')
-    date_str = data.get('date')
+    # Get form data for mixed content (file + text)
+    # If JSON is sent, request.form is empty, so we must support both or switch frontend to FormData exclusively.
     
+    # Check if request is JSON or Multipart
+    if request.is_json:
+        req_data = request.json
+        method = req_data.get('method', 'Unknown')
+        date_str = req_data.get('date')
+        proof_path = None
+    else:
+        req_data = request.form
+        method = req_data.get('method', 'Unknown')
+        date_str = req_data.get('date')
+        
+        # Handle File
+        proof_path = None
+        if 'proof' in request.files:
+            file = request.files['proof']
+            if file and file.filename != '':
+                # Secure filename and save
+                # Ensure uploads dir exists
+                uploads_dir = os.path.join(BASE_DIR, 'uploads')
+                if not os.path.exists(uploads_dir):
+                    os.makedirs(uploads_dir)
+                    
+                ext = os.path.splitext(file.filename)[1]
+                filename = f"{uuid.uuid4()}{ext}"
+                file.save(os.path.join(uploads_dir, filename))
+                proof_path = f"/uploads/{filename}"
+
     payment_date = date_str if date_str else datetime.now().isoformat()
         
-    c.execute('INSERT INTO payments (loan_id, amount, date, method) VALUES (?, ?, ?, ?)', 
-              (loan_id, amount, payment_date, method))
+    c.execute('INSERT INTO payments (loan_id, amount, date, method, proof_image) VALUES (?, ?, ?, ?, ?)', 
+              (loan_id, amount, payment_date, method, proof_path))
     conn.commit()
     conn.close()
     

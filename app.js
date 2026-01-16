@@ -18,13 +18,22 @@ const formatMoney = (amount) => {
 };
 
 const apiRequest = async (endpoint, method = 'GET', body = null) => {
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = {};
     if (state.token) {
         headers['Authorization'] = `Bearer ${state.token}`;
     }
 
     const config = { method, headers };
-    if (body) config.body = JSON.stringify(body);
+
+    if (body) {
+        if (body instanceof FormData) {
+            // Let browser set Content-Type for FormData
+            config.body = body;
+        } else {
+            headers['Content-Type'] = 'application/json';
+            config.body = JSON.stringify(body);
+        }
+    }
 
     try {
         const response = await fetch(`${API_URL}${endpoint}`, config);
@@ -135,9 +144,17 @@ const rejectLoan = async (id) => {
     }
 };
 
-const recordPayment = async (loanId, amount, method, date) => {
+const recordPayment = async (loanId, amount, method, date, file) => {
     try {
-        await apiRequest(`/loans/${loanId}/pay`, 'POST', { amount, method, date });
+        const formData = new FormData();
+        formData.append('amount', amount);
+        formData.append('method', method);
+        formData.append('date', date);
+        if (file) {
+            formData.append('proof', file);
+        }
+
+        await apiRequest(`/loans/${loanId}/pay`, 'POST', formData);
         document.getElementById('payment-modal').classList.add('hidden');
         document.getElementById('payment-amount').value = '';
         fetchLoans();
@@ -596,7 +613,7 @@ const renderDashboard = () => {
                     <div class="loan-title">${displayHeader}</div>
                     <div class="loan-subtitle">
                         <span class="loan-status status-active">Active</span>
-                        ${loan.months}mo Term
+                        ${loan.months}mo Term • ${loan.payment_frequency || 'Monthly'}
                     </div>
                    <div style="margin-top: 8px;">
                         <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8em;" onclick="event.stopPropagation(); openPayment(${loan.id})">
@@ -970,6 +987,7 @@ const initCreateListeners = () => {
             rate: parseFloat(document.getElementById('interest').value),
             months: parseInt(document.getElementById('tenure').value),
             interestType: document.getElementById('interest-type').value,
+            paymentFrequency: document.getElementById('payment-frequency').value,
             monthly,
             total
         };
@@ -1058,6 +1076,7 @@ window.openPayment = (id) => {
     document.getElementById('payment-method').value = 'Cash';
     document.getElementById('payment-method-other').classList.add('hidden');
     document.getElementById('payment-method-other').value = '';
+    document.getElementById('payment-proof').value = '';
 
     // Set Date to Today
     const today = new Date().toISOString().split('T')[0];
@@ -1132,7 +1151,8 @@ window.openLoanDetails = (id) => {
             div.style.justifyContent = 'space-between';
             const date = new Date(payment.date).toLocaleDateString();
             const method = payment.method ? ` <span style="font-size:0.8em; color:var(--text-secondary);">(${payment.method})</span>` : '';
-            div.innerHTML = `<span>${date}${method}</span><span style="color: var(--success);">+${formatMoney(payment.amount)}</span>`;
+            const proof = payment.proof_image ? ` <a href="${payment.proof_image}" target="_blank" style="font-size:0.8em; color:#818cf8; margin-left:5px;">(View Proof)</a>` : '';
+            div.innerHTML = `<span>${date}${method}${proof}</span><span style="color: var(--success);">+${formatMoney(payment.amount)}</span>`;
             historyList.appendChild(div);
         });
     } else {
@@ -1292,6 +1312,8 @@ document.getElementById('confirm-payment').addEventListener('click', () => {
     }
 
     const date = document.getElementById('payment-date').value;
+    const fileInput = document.getElementById('payment-proof');
+    const file = fileInput.files[0];
 
     if (amount > 0 && currentPaymentLoanId) {
         const loan = state.loans.find(l => l.id === currentPaymentLoanId);
@@ -1303,7 +1325,7 @@ document.getElementById('confirm-payment').addEventListener('click', () => {
                 return;
             }
         }
-        recordPayment(currentPaymentLoanId, amount, method, date);
+        recordPayment(currentPaymentLoanId, amount, method, date, file);
     } else {
         alert("Please enter a valid amount.");
     }

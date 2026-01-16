@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: loan-link
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn server:app
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: EMAIL_ADDRESS
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
