@@ -3,7 +3,7 @@ services:
     name: loan-link
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn server:app
+    startCommand: gunicorn server:app --workers 1 --threads 8 --timeout 120
     envVars:
       - key: PORT
         value: 10000
