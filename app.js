@@ -108,7 +108,9 @@ const logout = () => {
 // Loan Actions
 const fetchLoans = async () => {
     try {
+        console.log('Fetching loans...');
         const loans = await apiRequest('/loans');
+        console.log('Loans fetched:', loans);
         state.loans = loans;
         if (state.view === 'dashboard') renderDashboard();
     } catch (e) {
@@ -118,15 +120,18 @@ const fetchLoans = async () => {
 
 const createLoan = async (loanData) => {
     try {
+        console.log('Creating loan with data:', loanData);
         const res = await apiRequest('/loans', 'POST', loanData);
+        console.log('Create loan response:', res);
         if (res.success === false) {
             alert('Warning: ' + res.error);
         } else {
             alert('Loan proposal sent successfully! The other party needs to accept it.');
         }
         navigate('dashboard');
-        fetchLoans();
+        await fetchLoans(); // Wait for fetch to complete
     } catch (e) {
+        console.error('Create loan error:', e);
         alert("Failed to create loan: " + e.message);
     }
 };
@@ -575,13 +580,20 @@ const renderDashboard = () => {
             return loan.counterparty; // Fallback to email
         };
 
+        console.log('Rendering dashboard with loans:', state.loans);
+        console.log('Current user email:', state.user?.email);
+
         state.loans.forEach(loan => {
+            console.log('Processing loan:', loan.id, 'Status:', loan.status, 'Creator:', loan.creator_email, 'Role:', loan.role);
+
             const displayTitle = getLoanTitle(loan);
             const isItem = loan.asset_type === 'item';
 
             // Status checks
             if (loan.status === 'pending') {
+                console.log('Found pending loan:', loan.id);
                 const isCreator = loan.creator_email === state.user.email;
+                console.log('Is creator?', isCreator);
                 const isMyRole = loan.role === 'lender' ? 'Lending' : 'Borrowing';
 
                 let displayAmount = isItem ? loan.item_name : formatMoney(loan.amount);
