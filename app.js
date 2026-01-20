@@ -17,6 +17,14 @@ const formatMoney = (amount) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 };
 
+const getTermUnit = (freq) => {
+    if (freq === 'Weekly') return 'wks';
+    if (freq === 'Bi-Weekly') return 'bi-wks';
+    if (freq === 'Daily') return 'days';
+    if (freq === 'One Time') return 'days';
+    return 'mo';
+};
+
 const apiRequest = async (endpoint, method = 'GET', body = null) => {
     const headers = {};
     if (state.token) {
@@ -615,6 +623,7 @@ const renderDashboard = () => {
 
             let iconName = isItem ? 'cube-outline' : (loan.role === 'borrower' ? 'arrow-down-outline' : 'arrow-up-outline');
             let displayHeader = isItem ? `${loan.item_name} (${displayTitle})` : displayTitle;
+            let termUnit = getTermUnit(loan.payment_frequency);
 
             div.innerHTML = `
                 <div class="loan-icon">
@@ -624,7 +633,7 @@ const renderDashboard = () => {
                     <div class="loan-title">${displayHeader}</div>
                     <div class="loan-subtitle">
                         <span class="loan-status status-active">Active</span>
-                        ${loan.months}mo Term • ${loan.payment_frequency || 'Monthly'}
+                        ${loan.months} ${termUnit} Term • ${loan.payment_frequency || 'Monthly'}
                     </div>
                    <div style="margin-top: 8px;">
                         <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8em;" onclick="event.stopPropagation(); openPayment(${loan.id})">
@@ -798,33 +807,131 @@ const initResetListeners = () => {
 
 const initCreateListeners = () => {
     const form = document.getElementById('create-loan-form');
-    const inputs = ['amount', 'interest', 'tenure', 'interest-type'];
+    const inputs = ['amount', 'interest', 'tenure', 'interest-type', 'payment-frequency', 'repayment-start-date'];
+
+    const updateStartDateHint = () => {
+        const dateVal = document.getElementById('repayment-start-date').value;
+        const hintEl = document.getElementById('repayment-day-hint');
+        if (!hintEl) return;
+
+        if (dateVal) {
+            const date = new Date(dateVal);
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            const dayName = days[date.getUTCDay()]; // Use UTC to avoid timezone shifts on simple dates
+            hintEl.textContent = `Starts on a ${dayName}`;
+        } else {
+            hintEl.textContent = '';
+        }
+    };
+
+    const updateLabels = () => {
+        const freq = document.getElementById('payment-frequency').value;
+        const tenureLabel = document.getElementById('tenure-label');
+        const previewMonthlyLabel = document.getElementById('preview-monthly-label');
+
+        // Update Duration Label
+        switch (freq) {
+            case 'Weekly':
+                tenureLabel.textContent = "Duration (Weeks)";
+                break;
+            case 'Bi-Weekly':
+                tenureLabel.textContent = "Duration (Bi-Weeks)"; // A bit weird but accurate
+                break;
+            case 'Daily':
+                tenureLabel.textContent = "Duration (Days)";
+                break;
+            case 'One Time':
+                tenureLabel.textContent = "Repayment Due In (Days)";
+                break;
+            default: // Monthly
+                tenureLabel.textContent = "Duration (Months)";
+                break;
+        }
+
+        // Update Payment Preview Label
+        let labelText = "Monthly Payment:";
+        if (freq === 'Weekly') labelText = "Weekly Payment:";
+        else if (freq === 'Bi-Weekly') labelText = "Bi-Weekly Payment:";
+        else if (freq === 'Daily') labelText = "Daily Payment:";
+        else if (freq === 'One Time') labelText = "Single Payment:";
+
+        // Override if Asset Type is Item
+        const assetType = form.querySelector('input[name="assetType"]:checked').value;
+        if (assetType === 'item') {
+            labelText = labelText.replace("Payment", "Fee");
+        }
+
+        previewMonthlyLabel.textContent = labelText;
+    };
 
     const updatePreview = () => {
+        updateLabels();
+        updateStartDateHint();
+
         const amount = parseFloat(document.getElementById('amount').value) || 0;
         const rate = parseFloat(document.getElementById('interest').value) || 0;
-        const months = parseInt(document.getElementById('tenure').value) || 12;
+        let episodes = parseInt(document.getElementById('tenure').value) || 1;
         const type = document.getElementById('interest-type').value;
+        const freq = document.getElementById('payment-frequency').value;
 
-        // Simple calc (reused)
-        let monthly = 0;
+        // One Time logic: Treat 'episodes' as Days. No periodic payment (or rather, 1 period).
+        if (freq === 'One Time') {
+            // Simple Interest: P * r * (days/365)
+            // Compound: P * (1 + r)^t ? Rarely used for micro-loans in this context, usually simple.
+            // Let's stick to the selected type.
+
+            let total = 0;
+            const years = episodes / 365;
+
+            if (type === 'simple') {
+                total = amount + (amount * (rate / 100) * years);
+            } else {
+                // Compound Daily? Or Annually? Assuming Daily compounding for 'Daily' duration context or just Annual rate componded once?
+                // Let's assume standard Compound Interest formula A = P(1 + r/n)^(nt)
+                // If rate is Annual, and we compound Monthly (standard), but period is less than a month?
+                // Let's Simplify: Continuous or Daily compounding for "One Time" if Compound is selected.
+                const r = rate / 100;
+                total = amount * Math.exp(r * years); // Continuous approximation for simplicity or just P(1+r)^t
+            }
+
+            document.getElementById('preview-monthly').textContent = formatMoney(total); // "Single Payment"
+            document.getElementById('preview-total').textContent = formatMoney(total);
+            return;
+        }
+
+        // Periodic Logic
+        let periodsPerYear = 12; // Monthly
+        if (freq === 'Weekly') periodsPerYear = 52;
+        if (freq === 'Bi-Weekly') periodsPerYear = 26;
+        if (freq === 'Daily') periodsPerYear = 365;
+
+        // Calculate periodic installment
+        let installment = 0;
         let total = 0;
+
         if (type === 'simple') {
-            const years = months / 12;
-            total = amount + (amount * (rate / 100) * years);
-            monthly = total / months;
+            // Total Interest = P * R * T(years)
+            // T in years = episodes / periodsPerYear
+            const years = episodes / periodsPerYear;
+            const totalInterest = amount * (rate / 100) * years;
+            total = amount + totalInterest;
+            installment = total / episodes;
         } else {
-            const i = (rate / 100) / 12;
+            // Amortization Formula
+            // i = rate per period
+            const i = (rate / 100) / periodsPerYear;
+
             if (i === 0) {
                 total = amount;
-                monthly = amount / months;
+                installment = amount / episodes;
             } else {
-                monthly = amount * (i * Math.pow(1 + i, months)) / (Math.pow(1 + i, months) - 1);
-                total = monthly * months;
+                // M = P [ i(1 + i)^n ] / [ (1 + i)^n – 1 ]
+                installment = amount * (i * Math.pow(1 + i, episodes)) / (Math.pow(1 + i, episodes) - 1);
+                total = installment * episodes;
             }
         }
 
-        document.getElementById('preview-monthly').textContent = formatMoney(monthly);
+        document.getElementById('preview-monthly').textContent = formatMoney(installment);
         document.getElementById('preview-total').textContent = formatMoney(total);
     };
 
@@ -845,18 +952,16 @@ const initCreateListeners = () => {
         if (val === 'item') {
             itemFields.classList.remove('hidden');
             amountLabel.textContent = "Rental Fee / Deposit ($)";
-            previewMonthlyLabel.textContent = "Monthly Fee:";
             previewTotalLabel.textContent = "Total Fees:";
             document.getElementById('item-name').required = true;
         } else {
             itemFields.classList.add('hidden');
             amountLabel.textContent = "Amount ($)";
-            previewMonthlyLabel.textContent = "Monthly Payment:";
             previewTotalLabel.textContent = "Total Repayment:";
             document.getElementById('item-name').required = false;
         }
         updateAssetRadios();
-        updatePreview();
+        updatePreview(); // Will handle the Monthly/Fee label
     };
 
     const updateAssetRadios = () => {
@@ -911,6 +1016,7 @@ const initCreateListeners = () => {
     // Init state
     updateRadios();
     updateAssetRadios();
+    updatePreview(); // Trigger initial calc and labels
 
     // Cancel Button
     document.getElementById('create-cancel').addEventListener('click', () => {
@@ -936,6 +1042,9 @@ const initCreateListeners = () => {
             document.getElementById('interest').value = loan.rate;
             document.getElementById('tenure').value = loan.months;
             document.getElementById('interest-type').value = loan.interestType;
+            if (loan.payment_frequency) document.getElementById('payment-frequency').value = loan.payment_frequency;
+            if (loan.loan_date) document.getElementById('loan-start-date').value = loan.loan_date;
+            if (loan.repayment_start_date) document.getElementById('repayment-start-date').value = loan.repayment_start_date;
 
             if (loan.asset_type === 'item') {
                 document.getElementById('item-name').value = loan.item_name || '';
@@ -1065,6 +1174,14 @@ window.openReview = (id) => {
              <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
                 <span>Interest:</span>
                 <strong>${loan.rate}% (${loan.interestType})</strong>
+            </div>
+             <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+                <span>Term:</span>
+                <strong>${loan.months} ${getTermUnit ? getTermUnit(loan.payment_frequency) : 'months'}</strong>
+            </div>
+             <div style="display:flex; justify-content:space-between; margin-bottom: 4px;">
+                <span>Payment:</span>
+                <strong>${formatMoney(loan.monthly)} / ${loan.payment_frequency || 'Monthly'}</strong>
             </div>
              <div style="display:flex; justify-content:space-between; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 4px; margin-top: 4px;">
                 <span>Total ${isItem ? 'Fees' : 'Repayment'}:</span>

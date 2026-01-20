@@ -220,6 +220,14 @@ def send_loan_notification_email(recipient_email, loan_data):
         else:
             action = f"{creator_name} is offering to lend to you"
 
+        # Determine Term Unit
+        freq = loan_data.get('payment_frequency', 'Monthly')
+        term_unit = 'months'
+        if freq == 'Weekly': term_unit = 'weeks'
+        elif freq == 'Bi-Weekly': term_unit = 'bi-weeks'
+        elif freq == 'Daily': term_unit = 'days'
+        elif freq == 'One Time': term_unit = 'days'
+
         # ... (Rest of HTML/Text generation is same, abbreviated for brevity)
         html = f"""
         <html>
@@ -265,7 +273,7 @@ def send_loan_notification_email(recipient_email, loan_data):
                                 </tr>
                                 <tr>
                                     <td style="padding: 10px; color: #64748b;">Term:</td>
-                                    <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data['months']} months</td>
+                                    <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data['months']} {term_unit}</td>
                                 </tr>
                                 <tr>
                                     <td style="padding: 10px; color: #64748b;">Loan Date:</td>
@@ -276,7 +284,7 @@ def send_loan_notification_email(recipient_email, loan_data):
                                     <td style="padding: 10px; font-weight: bold; text-align: right;">{loan_data.get('repayment_start_date', 'N/A')}</td>
                                 </tr>
                                 <tr style="border-top: 2px solid #e2e8f0;">
-                                    <td style="padding: 10px; color: #64748b;">{"Monthly Fee" if loan_data.get('asset_type') == 'item' else "Monthly Payment"}:</td>
+                                    <td style="padding: 10px; color: #64748b;">{f"{loan_data.get('payment_frequency', 'Monthly')} {'Fee' if loan_data.get('asset_type') == 'item' else 'Payment'}"}:</td>
                                     <td style="padding: 10px; font-weight: bold; text-align: right; color: #10b981;">${loan_data['monthly']:,.2f}</td>
                                 </tr>
                                 <tr>
@@ -314,7 +322,7 @@ def send_loan_notification_email(recipient_email, loan_data):
         """
         
         if loan_data.get('asset_type') == 'item':
-            text = f"LoanLink - New Loan Request\n\n{action}\n\nItem: {loan_data['item_name']}\nTerm: {loan_data['months']} months"
+            text = f"LoanLink - New Loan Request\n\n{action}\n\nItem: {loan_data['item_name']}\nTerm: {loan_data['months']} {term_unit}"
         else:
             text = f"LoanLink - New Loan Request\n\n{action}\n\nAmount: ${loan_data['amount']:,.2f}\nInterest: {loan_data['rate']}%"
 
