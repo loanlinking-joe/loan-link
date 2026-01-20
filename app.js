@@ -566,40 +566,41 @@ const renderDashboard = () => {
     let totalLent = 0;
     let hasPending = false;
 
-    // Helper for display name
-    const getLoanTitle = (loan) => {
-        if (loan.creator_email === state.user.email && loan.counterparty_name) {
-            return loan.counterparty_name; // Use alias if I created it
-        }
-        return loan.counterparty; // Fallback to email
-    };
+    try {
+        // Helper for display name
+        const getLoanTitle = (loan) => {
+            if (loan.creator_email === state.user.email && loan.counterparty_name) {
+                return loan.counterparty_name; // Use alias if I created it
+            }
+            return loan.counterparty; // Fallback to email
+        };
 
-    state.loans.forEach(loan => {
-        const displayTitle = getLoanTitle(loan);
-        const isItem = loan.asset_type === 'item';
+        state.loans.forEach(loan => {
+            const displayTitle = getLoanTitle(loan);
+            const isItem = loan.asset_type === 'item';
 
-        // Status checks
-        if (loan.status === 'pending') {
-            const isCreator = loan.creator_email === state.user.email;
-            const isMyRole = loan.role === 'lender' ? 'Lending' : 'Borrowing';
+            // Status checks
+            if (loan.status === 'pending') {
+                const isCreator = loan.creator_email === state.user.email;
+                const isMyRole = loan.role === 'lender' ? 'Lending' : 'Borrowing';
 
-            let displayAmount = isItem ? loan.item_name : formatMoney(loan.amount);
+                let displayAmount = isItem ? loan.item_name : formatMoney(loan.amount);
 
-            let actionHtml = '';
-            if (isCreator) {
-                actionHtml = `
+                let actionHtml = '';
+                if (isCreator) {
+                    actionHtml = `
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <span class="loan-status" style="background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); margin-right:8px; border: 1px solid var(--glass-border); font-size: 0.75rem; padding: 4px 8px;">Waiting for Approval</span>
                         <button class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8em;" onclick="event.stopPropagation(); cancelLoan(${loan.id})">Cancel</button>
                     </div>
                 `;
-            } else {
-                actionHtml = `<button class="btn btn-primary" onclick="event.stopPropagation(); window.openReview(${loan.id})">Review Request</button>`;
-            }
+                } else {
+                    actionHtml = `<button class="btn btn-primary" onclick="event.stopPropagation(); window.openReview(${loan.id})">Review Request</button>`;
+                }
 
-            const div = document.createElement('div');
-            div.className = 'loan-item';
-            div.innerHTML = `
+                const div = document.createElement('div');
+                div.className = 'loan-item';
+                div.innerHTML = `
                 <div class="loan-icon"><ion-icon name="${isItem ? 'cube-outline' : 'time-outline'}"></ion-icon></div>
                 <div class="loan-details">
                     <div class="loan-title">${displayAmount}</div>
@@ -607,25 +608,25 @@ const renderDashboard = () => {
                 </div>
                 <div>${actionHtml}</div>
             `;
-            pendingContainer.appendChild(div);
-            hasPending = true;
+                pendingContainer.appendChild(div);
+                hasPending = true;
 
-        } else if (loan.status === 'active') {
-            // Calculate stats
-            const remaining = loan.total - loan.paid;
-            if (loan.role === 'borrower') totalOwed += remaining;
-            else totalLent += remaining;
+            } else if (loan.status === 'active') {
+                // Calculate stats
+                const remaining = loan.total - loan.paid;
+                if (loan.role === 'borrower') totalOwed += remaining;
+                else totalLent += remaining;
 
-            const div = document.createElement('div');
-            div.className = 'loan-item ' + (loan.role === 'borrower' ? 'owed' : '');
-            div.style.cursor = 'pointer';
-            div.setAttribute('onclick', `openLoanDetails(${loan.id})`);
+                const div = document.createElement('div');
+                div.className = 'loan-item ' + (loan.role === 'borrower' ? 'owed' : '');
+                div.style.cursor = 'pointer';
+                div.setAttribute('onclick', `openLoanDetails(${loan.id})`);
 
-            let iconName = isItem ? 'cube-outline' : (loan.role === 'borrower' ? 'arrow-down-outline' : 'arrow-up-outline');
-            let displayHeader = isItem ? `${loan.item_name} (${displayTitle})` : displayTitle;
-            let termUnit = getTermUnit(loan.payment_frequency);
+                let iconName = isItem ? 'cube-outline' : (loan.role === 'borrower' ? 'arrow-down-outline' : 'arrow-up-outline');
+                let displayHeader = isItem ? `${loan.item_name} (${displayTitle})` : displayTitle;
+                let termUnit = getTermUnit(loan.payment_frequency);
 
-            div.innerHTML = `
+                div.innerHTML = `
                 <div class="loan-icon">
                     <ion-icon name="${iconName}"></ion-icon>
                 </div>
@@ -646,9 +647,22 @@ const renderDashboard = () => {
                     <span style="font-size:0.8em; color:var(--text-secondary);">of ${formatMoney(loan.total)}</span>
                 </div>
             `;
-            activeContainer.appendChild(div);
-        }
-    });
+                activeContainer.appendChild(div);
+            }
+        });
+
+    } catch (e) {
+        console.error("Dashboard Render Error:", e);
+        // Don't alert here to avoid spamming, but log it.
+    }
+
+    if (activeContainer.children.length === 0) {
+        activeContainer.innerHTML = `
+            <div class="glass-panel text-center" style="opacity: 0.6; padding: 40px;">
+                <p>No active loans.</p>
+            </div>
+        `;
+    }
 
     if (hasPending) pendingSection.classList.remove('hidden');
     else pendingSection.classList.add('hidden');
