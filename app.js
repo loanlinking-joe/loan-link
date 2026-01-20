@@ -589,12 +589,12 @@ const renderDashboard = () => {
             if (isCreator) {
                 actionHtml = `
                     <div style="display: flex; gap: 8px; align-items: center;">
-                        <span class="loan-status" style="background: var(--glass-border); color: var(--text-secondary); margin-right:8px;">Waiting</span>
-                        <button class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8em;" onclick="cancelLoan(${loan.id})">Cancel</button>
+                        <span class="loan-status" style="background: rgba(255, 255, 255, 0.1); color: var(--text-secondary); margin-right:8px; border: 1px solid var(--glass-border); font-size: 0.75rem; padding: 4px 8px;">Waiting for Approval</span>
+                        <button class="btn btn-secondary" style="padding: 6px 10px; font-size: 0.8em;" onclick="event.stopPropagation(); cancelLoan(${loan.id})">Cancel</button>
                     </div>
                 `;
             } else {
-                actionHtml = `<button class="btn btn-primary" onclick="window.openReview(${loan.id})">Review Request</button>`;
+                actionHtml = `<button class="btn btn-primary" onclick="event.stopPropagation(); window.openReview(${loan.id})">Review Request</button>`;
             }
 
             const div = document.createElement('div');
